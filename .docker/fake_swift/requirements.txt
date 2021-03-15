@@ -1,0 +1,4 @@
+Flask==1.1.2
+gunicorn==20.0.4
+keystonemiddleware==9.2.0
+PasteDeploy==2.1.1
