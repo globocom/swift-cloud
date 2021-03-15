@@ -12,7 +12,7 @@ services:
             MYSQL_ALLOW_EMPTY_PASSWORD: 1
         networks:
             swift_gcp_net:
-                ipv4_address: 10.5.0.5
+                ipv4_address: 10.8.0.5
 
     keystone:
         container_name: keystone
@@ -27,7 +27,7 @@ services:
             - 5000:5000
         networks:
             swift_gcp_net:
-                ipv4_address: 10.5.0.4
+                ipv4_address: 10.8.0.4
 
     fake-swift:
         container_name: fake_swift
@@ -41,9 +41,9 @@ services:
             - 8080:8080
         networks:
             swift_gcp_net:
-                ipv4_address: 10.5.0.3
+                ipv4_address: 10.8.0.3
         extra_hosts:
-            - 'localhost:10.5.0.4'
+            - 'localhost:10.8.0.4'
 
 volumes:
     vol_mysql:
@@ -54,4 +54,4 @@ networks:
         driver: bridge
         ipam:
             config:
-                - subnet: 10.5.0.0/16
+                - subnet: 10.8.0.0/16
