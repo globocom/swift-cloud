@@ -9,7 +9,7 @@ setup(
     install_requires=[
         'Flask==1.1.2',
         'PasteDeploy==2.1.1',
-        'keystonemiddleware==9.2.0'
+        'keystonemiddleware==8.0.0'
     ],
     packages=find_packages(),
     include_package_data=True,

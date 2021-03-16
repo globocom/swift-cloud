@@ -1,4 +1,4 @@
-.PHONY: help clean deps setup pycodestyle delete-db migrations-test tests tests-ci run docker-up docker-down docker-clean
+.PHONY: help clean setup pycodestyle tests docker-build docker-clean docker run restart
 
 PROJECT_NAME = swift-gcp
 PROJECT_HOME := $(shell pwd)
@@ -32,3 +32,6 @@ docker: docker-build ## Build and start Docker containers
 	@docker-compose up
 
 run: docker ## Same as "docker"
+
+restart: ## Restart fake-swift from docker-compose
+	@docker-compose restart fake-swift
