@@ -2,3 +2,4 @@ Flask==1.1.2
 gunicorn==19.10.0
 keystonemiddleware==8.0.0
 PasteDeploy==2.1.1
+google-cloud-storage==1.36.2
