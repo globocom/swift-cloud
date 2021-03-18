@@ -69,7 +69,6 @@ create_endpoint "object-store" admin "http://localhost:8080/v1/AUTH_%(tenant_id)
 # test project and user
 create_project test
 create_user u_test u_test test
-create_role_assign u_test test admin
 create_role_assign u_test test swiftoperator
 
 # Restart uwsgi

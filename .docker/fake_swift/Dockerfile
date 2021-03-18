@@ -10,5 +10,3 @@ WORKDIR /home/app
 COPY . .
 
 RUN pip install -r requirements.txt
-
-ENTRYPOINT ["./run.sh"]

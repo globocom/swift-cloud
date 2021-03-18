@@ -1,57 +1,38 @@
 version: '3'
 
 services:
-    mysql:
+    database:
         container_name: database
         image: mysql:5.7
         volumes:
-            - vol_mysql:/var/lib/mysql
+            - vol_database:/var/lib/database
         ports:
             - 3307:3306
         environment:
             MYSQL_ALLOW_EMPTY_PASSWORD: 1
-        networks:
-            swift_gcp_net:
-                ipv4_address: 10.8.0.5
 
     keystone:
         container_name: keystone
         build:
-            context: ./.docker/keystone
+            context: .docker/keystone
         volumes:
             - vol_keystone:/etc/keystone
         depends_on:
-            - mysql
+            - database
         ports:
             - 35357:35357
             - 5000:5000
-        networks:
-            swift_gcp_net:
-                ipv4_address: 10.8.0.4
 
     fake-swift:
         container_name: fake_swift
         build:
-            context: ./.docker/fake_swift
-        depends_on:
-            - keystone
-        links:
-            - keystone
+            context: .docker/fake_swift
+        volumes:
+            - .:/home/swift_gcp
+        entrypoint: bash -c "pip install -e /home/swift_gcp && ./run.sh"
         ports:
             - 8080:8080
-        networks:
-            swift_gcp_net:
-                ipv4_address: 10.8.0.3
-        extra_hosts:
-            - 'localhost:10.8.0.4'
 
 volumes:
-    vol_mysql:
+    vol_database:
     vol_keystone:
-
-networks:
-    swift_gcp_net:
-        driver: bridge
-        ipam:
-            config:
-                - subnet: 10.8.0.0/16
