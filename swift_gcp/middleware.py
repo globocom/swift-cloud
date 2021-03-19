@@ -1,4 +1,7 @@
+import logging
 from webob import Request, Response
+
+log = logging.getLogger(__name__)
 
 
 class SwiftGCPMiddleware(object):
@@ -15,10 +18,12 @@ class SwiftGCPMiddleware(object):
     def __call__(self, environ, start_response):
         req = Request(environ)
 
-        if 'X-Object-GCP' in environ:
-            return self.swift_gcp_response(req)(environ, start_response)
+        # def custom_response(status, headers):
+        #     return start_response(status, headers)
 
-        return self.app(environ, start_response)
+        # return self.app(environ, custom_response)
+
+        return self.swift_gcp_response(req)(environ, start_response)
 
     def swift_gcp_response(self, req):
         return Response(request=req,

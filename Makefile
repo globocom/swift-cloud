@@ -29,9 +29,10 @@ docker-clean: ## Remove any container, network, volume and image created by dock
 	@docker-compose down -v --rmi all --remove-orphans
 
 docker: docker-build ## Build and start Docker containers
-	@docker-compose up
+	@docker-compose up -d
+	@docker attach fake_swift
 
 run: docker ## Same as "docker"
 
 restart: ## Restart fake-swift from docker-compose
-	@docker-compose restart fake-swift
+	@docker-compose restart fake_swift

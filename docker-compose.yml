@@ -1,38 +1,43 @@
 version: '3'
 
 services:
-    database:
-        container_name: database
-        image: mysql:5.7
-        volumes:
-            - vol_database:/var/lib/database
-        ports:
-            - 3307:3306
-        environment:
-            MYSQL_ALLOW_EMPTY_PASSWORD: 1
+  database:
+    container_name: database
+    image: mysql:5.7
+    volumes:
+      - vol_database:/var/lib/mysql
+    ports:
+      - 3307:3306
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
 
-    keystone:
-        container_name: keystone
-        build:
-            context: .docker/keystone
-        volumes:
-            - vol_keystone:/etc/keystone
-        depends_on:
-            - database
-        ports:
-            - 35357:35357
-            - 5000:5000
+  keystone:
+    container_name: keystone
+    build:
+      context: .docker/keystone
+    volumes:
+      - vol_keystone:/etc/keystone
+    depends_on:
+      - database
+    ports:
+      - 35357:35357
+      - 5000:5000
 
-    fake-swift:
-        container_name: fake_swift
-        build:
-            context: .docker/fake_swift
-        volumes:
-            - .:/home/swift_gcp
-        entrypoint: bash -c "pip install -e /home/swift_gcp && ./run.sh"
-        ports:
-            - 8080:8080
+  fake_swift:
+    container_name: fake_swift
+    build:
+      context: .docker/fake_swift
+    volumes:
+      - .docker/fake_swift:/home/app
+      - .:/home/swift_gcp
+    entrypoint: bash -c "pip install -e /home/swift_gcp && ./run"
+    ports:
+      - 8080:8080
+    stdin_open: true
+    tty: true
+    environment:
+      FLASK_ENV: development
 
 volumes:
-    vol_database:
-    vol_keystone:
+  vol_database:
+  vol_keystone:
