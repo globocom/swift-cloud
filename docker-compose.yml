@@ -29,8 +29,8 @@ services:
       context: .docker/fake_swift
     volumes:
       - .docker/fake_swift:/home/app
-      - .:/home/swift_gcp
-    entrypoint: bash -c "pip install -e /home/swift_gcp && ./run"
+      - .:/home/swift_cloud
+    entrypoint: bash -c "pip install -e /home/swift_cloud && ./run"
     ports:
       - 8080:8080
     stdin_open: true

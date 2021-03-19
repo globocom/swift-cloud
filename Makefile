@@ -1,6 +1,6 @@
 .PHONY: help clean setup pycodestyle tests docker-build docker-clean docker run restart
 
-PROJECT_NAME = swift-gcp
+PROJECT_NAME = swift-cloud
 PROJECT_HOME := $(shell pwd)
 
 help:

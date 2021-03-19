@@ -48,4 +48,4 @@ def filter_factory(global_conf, **local_conf):
     def swift_cloud_filter(app):
         return SwiftCloudMiddleware(app, conf)
 
-    return swift_gcp_filter
+    return swift_cloud_filter
