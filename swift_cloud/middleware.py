@@ -1,6 +1,6 @@
 import logging
 from webob import Request, Response
-from swift_cloud.drivers import GCPDriver
+from swift_cloud.drivers.gcp import GCPDriver
 
 log = logging.getLogger(__name__)
 
