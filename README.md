@@ -1,3 +1,3 @@
-# Swift GCP
+# Swift Cloud
 
-Middleware for Openstack Swift to store objecs on Google Cloud Storage
+Middleware for Openstack Swift to store objecs in multiple cloud providers
