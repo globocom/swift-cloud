@@ -1,6 +1,6 @@
 import logging
-from webob import Request, Response
-from swift_cloud.drivers.gcp import GCPDriver
+from webob import Request
+from swift_cloud.drivers.gcp import SwiftGCPClient
 
 log = logging.getLogger(__name__)
 
@@ -27,14 +27,16 @@ class SwiftCloudMiddleware(object):
         return self.swift_cloud_response(req)(environ, start_response)
 
     def swift_cloud_response(self, req):
-        driver = None
+        driver = self.conf.get('driver', 'gcp')
+        client = None
 
-        if self.conf['driver'] == 'gcp':
-            driver = GCPDriver()
+        if driver == 'gcp':
+            client = SwiftGCPClient(req)
 
-        return Response(request=req,
-                        body='',
-                        content_type="text/plain")
+        if client:
+            return client.response()
+
+        return self.app
 
 
 def filter_factory(global_conf, **local_conf):
