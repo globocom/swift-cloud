@@ -28,6 +28,9 @@ docker-build: ## Build Docker containers
 docker-clean: ## Remove any container, network, volume and image created by docker
 	@docker-compose down -v --rmi all --remove-orphans
 
+docker-stop:
+	@docker-compose stop
+
 docker: docker-build ## Build and start Docker containers
 	@docker-compose up
 
