@@ -66,6 +66,12 @@ create_endpoint "object-store" public "http://localhost:8080/v1/AUTH_%(tenant_id
 create_endpoint "object-store" internal "http://localhost:8080/v1/AUTH_%(tenant_id)s"
 create_endpoint "object-store" admin "http://localhost:8080/v1/AUTH_%(tenant_id)s"
 
+# Vault project and user
+create_project Vault
+create_user u_vault u_vault Vault
+create_role_assign u_vault Vault admin
+create_role_assign u_vault Vault swiftoperator
+
 # test project and user
 create_project test
 create_user u_test u_test test
