@@ -7,9 +7,9 @@ from google.cloud import storage
 
 class SwiftGCPDriver:
 
-    def __init__(self, req, credentials):
+    def __init__(self, req, credentials_path):
         self.req = req
-        self.credentials = credentials
+        self.credentials_path = credentials_path
 
         self.account = None
         self.container = None
