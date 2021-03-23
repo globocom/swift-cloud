@@ -60,6 +60,7 @@ create_user u_fake_swift FAKE_SWIFT_PASS fake_swift
 create_role swiftoperator
 create_role ResellerAdmin
 create_role_assign u_fake_swift fake_swift admin
+create_role_assign u_fake_swift fake_swift swiftoperator
 create_role_assign u_fake_swift fake_swift ResellerAdmin
 create_service fake_swift "object-store"
 create_endpoint "object-store" public "http://localhost:8080/v1/AUTH_%(tenant_id)s"

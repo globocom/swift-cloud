@@ -1,4 +1,4 @@
-.PHONY: help clean setup pycodestyle tests docker-build docker-clean docker run restart
+.PHONY: help clean setup pycodestyle tests docker-build docker-clean docker-stop docker run restart stop
 
 PROJECT_NAME = swift-cloud
 PROJECT_HOME := $(shell pwd)
@@ -28,7 +28,7 @@ docker-build: ## Build Docker containers
 docker-clean: ## Remove any container, network, volume and image created by docker
 	@docker-compose down -v --rmi all --remove-orphans
 
-docker-stop:
+docker-stop: ## Stop docker-compose created containers
 	@docker-compose stop
 
 docker: docker-build ## Build and start Docker containers
@@ -40,3 +40,5 @@ run: ## Run docker-compose in background and attach to fake_swift container
 
 restart: ## Restart fake-swift from docker-compose
 	@docker-compose restart fake_swift
+
+stop: docker-stop ## Same as docker-stop
