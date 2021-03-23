@@ -19,7 +19,8 @@ class SwiftCloudMiddleware(object):
 
     def swift_cloud_handler(self, req):
         if self.driver_name == 'gcp':
-            driver = SwiftGCPDriver(req)
+            credentials = self.conf.get('gcp_credentials')
+            driver = SwiftGCPDriver(req, credentials)
             return driver.response()
 
         return Response(request=req, status=500, body=b'Invalid driver',

@@ -7,11 +7,14 @@ from google.cloud import storage
 
 class SwiftGCPDriver:
 
-    def __init__(self, req):
+    def __init__(self, req, credentials):
         self.req = req
+        self.credentials = credentials
+
         self.account = None
         self.container = None
         self.obj = None
+
         self.headers = {
             'Content-Type': 'application/json; charset=utf-8',
             'X-Timestamp': Timestamp.now().normal
