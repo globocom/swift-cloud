@@ -104,10 +104,14 @@ class SwiftGCPDriver:
         if self.req.method == 'DELETE':
             return self.delete_object()
 
-    def get_object(self):
+    def get_client(self):
         credentials = service_account.Credentials.from_service_account_file(self.credentials_path)
         scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
         client = storage.Client(credentials=credentials)
+        return client
+
+    def get_object(self):
+        client = self.get_client()
         bucket = client.get_bucket(self.account)
         obj = '/'.join([self.container, self.obj])
         blob = bucket.blob(obj)
@@ -129,7 +133,6 @@ class SwiftGCPDriver:
             'X-Object-Meta-Orig-Filename': self.obj,
             'X-Timestamp': Timestamp.now().normal
         }
-
         return Response(body=blob_in_bytes.getvalue(), status=200,
                         headers=HeaderKeyDict(**headers),
                         request=self.req)
@@ -138,7 +141,26 @@ class SwiftGCPDriver:
         return self._default_response('', 200, {})
 
     def delete_object(self):
-        return self._default_response('', 200, {})
+        client = self.get_client()
+        bucket = client.get_bucket(self.account)
+        obj = '/'.join([self.container, self.obj])
+        blob = bucket.blob(obj)
+
+        if not blob.exists():
+            headers = {
+                'Content-Type': 'text/html; charset=UTF-8',
+                'x-request-id': str(uuid4())
+            }
+            return self._default_response('', 404, headers)
+
+        blob.delete()
+
+        headers = {
+            'Content-Type': 'text/html; charset=UTF-8'
+        }
+        return Response(body='', status=204,
+                        headers=HeaderKeyDict(**headers),
+                        request=self.req)
 
     def _format_content(self, content):
         return json.dumps(content)
