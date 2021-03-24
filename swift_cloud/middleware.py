@@ -1,4 +1,5 @@
 import logging
+
 from swift.common.swob import Request, Response
 from swift_cloud.drivers.gcp import SwiftGCPDriver
 

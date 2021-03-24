@@ -1,18 +1,37 @@
-import json
 import io
+import json
+import logging
+from uuid import uuid4
+
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
 from swift.common.header_key_dict import HeaderKeyDict
-from google.oauth2 import service_account
+
 from google.cloud import storage
-from uuid import uuid4
+from google.oauth2 import service_account
+
+log = logging.getLogger(__name__)
+
+
+def is_container(blob):
+    n = blob.name.split('/')
+    return len(n) == 2 and n[-1] == ''
+
+
+def is_object(blob):
+    n = blob.name.split('/')
+    return len(n) >= 2 and n[-1] != ''
+
+
+def format_content(content):
+    return json.dumps(content)
 
 
 class SwiftGCPDriver:
 
     def __init__(self, req, credentials_path):
         self.req = req
-        self.credentials_path = credentials_path
+        self.client = self._get_client(credentials_path)
 
         self.account = None
         self.container = None
@@ -24,7 +43,6 @@ class SwiftGCPDriver:
         }
 
     def response(self):
-        params = {}
         version, account, container, obj = split_path(
             wsgi_to_str(self.req.path), 1, 4, True)
 
@@ -39,7 +57,20 @@ class SwiftGCPDriver:
         elif account and not container and not obj:
             return self.handle_account()
 
-        return Response(**params)
+        return self._default_response(b'Invalid request path', 500,
+                                      {'Content-Type': 'text/plain'})
+
+    def _get_client(self, credentials_path):
+        credentials = service_account.Credentials.from_service_account_file(credentials_path)
+        return storage.Client(credentials=credentials)
+
+    def _default_response(self, body, status, headers):
+        body = format_content(body)
+        headers.update(self.headers)
+
+        return Response(body=body, status=status,
+                        headers=HeaderKeyDict(**headers),
+                        request=self.req)
 
     def handle_account(self):
         # project_name = 'test'
@@ -52,9 +83,18 @@ class SwiftGCPDriver:
             return self.get_account()
 
     def head_account(self):
+        try:
+            bucket = self.client.get_bucket(self.account)
+            blobs = list(bucket.list_blobs())
+
+            containers = filter(is_container, blobs)
+            objects = filter(is_object, blobs)
+        except Exception as err:
+            log.error(err)
+
         headers = {
-            'X-Account-Container-Count': 1,
-            'X-Account-Object-Count': 0,
+            'X-Account-Container-Count': len(containers),
+            'X-Account-Object-Count': len(objects),
             'X-Account-Bytes-Used': 0
         }
 
@@ -83,8 +123,19 @@ class SwiftGCPDriver:
         return self._default_response(containers, status, headers)
 
     def handle_container(self):
+        if self.req.method == 'HEAD':
+            return self.head_container()
+
         if self.req.method == 'GET':
             return self.get_container()
+
+    def head_container(self):
+        headers = {
+            'X-Container-Object-Count': 0,
+            'X-Container-Bytes-Used': 0
+        }
+
+        return self._default_response('', 204, headers)
 
     def get_container(self):
         headers = {
@@ -104,15 +155,8 @@ class SwiftGCPDriver:
         if self.req.method == 'DELETE':
             return self.delete_object()
 
-    def get_client(self):
-        credentials = service_account.Credentials.from_service_account_file(self.credentials_path)
-        scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
-        client = storage.Client(credentials=credentials)
-        return client
-
     def get_object(self):
-        client = self.get_client()
-        bucket = client.get_bucket(self.account)
+        bucket = self.client.get_bucket(self.account)
         obj = '/'.join([self.container, self.obj])
         blob = bucket.blob(obj)
 
@@ -138,8 +182,7 @@ class SwiftGCPDriver:
                         request=self.req)
 
     def put_object(self):
-        client = self.get_client()
-        bucket = client.get_bucket(self.account)
+        bucket = self.client.get_bucket(self.account)
         obj = '/'.join([self.container, self.obj])
         blob = bucket.blob(obj)
         content_type = self.req.headers.get('Content-Type')
@@ -155,8 +198,7 @@ class SwiftGCPDriver:
                         request=self.req)
 
     def delete_object(self):
-        client = self.get_client()
-        bucket = client.get_bucket(self.account)
+        bucket = self.client.get_bucket(self.account)
         obj = '/'.join([self.container, self.obj])
         blob = bucket.blob(obj)
 
@@ -173,16 +215,5 @@ class SwiftGCPDriver:
             'Content-Type': 'text/html; charset=UTF-8'
         }
         return Response(body='', status=204,
-                        headers=HeaderKeyDict(**headers),
-                        request=self.req)
-
-    def _format_content(self, content):
-        return json.dumps(content)
-
-    def _default_response(self, body, status, headers):
-        body = self._format_content(body)
-        headers.update(self.headers)
-
-        return Response(body=body, status=status,
                         headers=HeaderKeyDict(**headers),
                         request=self.req)
