@@ -138,7 +138,21 @@ class SwiftGCPDriver:
                         request=self.req)
 
     def put_object(self):
-        return self._default_response('', 200, {})
+        client = self.get_client()
+        bucket = client.get_bucket(self.account)
+        obj = '/'.join([self.container, self.obj])
+        blob = bucket.blob(obj)
+        content_type = self.req.headers.get('Content-Type')
+        blob_in_bytes = io.BytesIO(self.req.body)
+        blob.upload_from_file(blob_in_bytes, content_type=content_type)
+
+        headers = {
+            'Content-Type': 'text/html; charset=UTF-8',
+            'Etag': blob.etag
+        }
+        return Response(body='', status=201,
+                        headers=HeaderKeyDict(**headers),
+                        request=self.req)
 
     def delete_object(self):
         client = self.get_client()
