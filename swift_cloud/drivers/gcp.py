@@ -1,8 +1,11 @@
 import json
+import io
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
 from swift.common.header_key_dict import HeaderKeyDict
+from google.oauth2 import service_account
 from google.cloud import storage
+from uuid import uuid4
 
 
 class SwiftGCPDriver:
@@ -25,7 +28,7 @@ class SwiftGCPDriver:
         version, account, container, obj = split_path(
             wsgi_to_str(self.req.path), 1, 4, True)
 
-        self.account = account.replace('AUTH_', '')
+        self.account = account.lower()
         self.container = container
         self.obj = obj
 
@@ -102,7 +105,34 @@ class SwiftGCPDriver:
             return self.delete_object()
 
     def get_object(self):
-        return self._default_response('', 200, {})
+        credentials = service_account.Credentials.from_service_account_file(self.credentials_path)
+        scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
+        client = storage.Client(credentials=credentials)
+        bucket = client.get_bucket(self.account)
+        obj = '/'.join([self.container, self.obj])
+        blob = bucket.blob(obj)
+
+        if not blob.exists():
+            headers = {
+                'Content-Type': 'text/html; charset=UTF-8',
+                'x-request-id': str(uuid4())
+            }
+            return self._default_response('', 404, headers)
+
+        blob.get_iam_policy()
+        blob_in_string = blob.download_as_string()
+        blob_in_bytes = io.BytesIO(blob_in_string)
+
+        headers = {
+            'Content-Type': blob.content_type,
+            'Accept-Ranges': 'bytes',
+            'X-Object-Meta-Orig-Filename': self.obj,
+            'X-Timestamp': Timestamp.now().normal
+        }
+
+        return Response(body=blob_in_bytes.getvalue(), status=200,
+                        headers=HeaderKeyDict(**headers),
+                        request=self.req)
 
     def put_object(self):
         return self._default_response('', 200, {})
@@ -116,11 +146,6 @@ class SwiftGCPDriver:
     def _default_response(self, body, status, headers):
         body = self._format_content(body)
         headers.update(self.headers)
-
-        params = {
-            'status': status,
-            'headers': headers
-        }
 
         return Response(body=body, status=status,
                         headers=HeaderKeyDict(**headers),
