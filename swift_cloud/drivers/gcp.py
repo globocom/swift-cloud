@@ -10,6 +10,8 @@ from swift.common.header_key_dict import HeaderKeyDict
 from google.cloud import storage
 from google.oauth2 import service_account
 
+from swift_cloud.drivers.base import BaseDriver
+
 log = logging.getLogger(__name__)
 
 
@@ -23,11 +25,19 @@ def is_object(blob):
     return len(n) >= 2 and n[-1] != ''
 
 
-def format_content(content):
-    return json.dumps(content)
+def  is_pseudofolder(blob):
+    n = blob.name.split('/')
+    return len(n) > 2 and n[-1] == ''
 
 
-class SwiftGCPDriver:
+def blobs_size(blob_list):
+    size = 0
+    for blob in blob_list:
+        size += blob.size
+    return size
+
+
+class SwiftGCPDriver(BaseDriver):
 
     def __init__(self, req, credentials_path):
         self.req = req
@@ -38,8 +48,10 @@ class SwiftGCPDriver:
         self.obj = None
 
         self.headers = {
-            'Content-Type': 'application/json; charset=utf-8',
-            'X-Timestamp': Timestamp.now().normal
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Timestamp': Timestamp.now().normal,
+            'X-Trans-Id': str(uuid4()),
+            'Accept-Ranges': 'bytes'
         }
 
     def response(self):
@@ -57,25 +69,26 @@ class SwiftGCPDriver:
         elif account and not container and not obj:
             return self.handle_account()
 
-        return self._default_response(b'Invalid request path', 500,
-                                      {'Content-Type': 'text/plain'})
+        return self._default_response(b'Invalid request path', 500)
 
     def _get_client(self, credentials_path):
         credentials = service_account.Credentials.from_service_account_file(credentials_path)
         return storage.Client(credentials=credentials)
 
-    def _default_response(self, body, status, headers):
-        body = format_content(body)
-        headers.update(self.headers)
-
+    def _default_response(self, body, status, headers={}):
+        self.headers.update(headers)
         return Response(body=body, status=status,
-                        headers=HeaderKeyDict(**headers),
+                        headers=HeaderKeyDict(**self.headers),
+                        request=self.req)
+
+    def _json_response(self, body, status, headers):
+        self.headers.update(headers)
+        self.headers['Content-Type'] = 'application/json; charset=utf-8'
+        return Response(body=json.dumps(body), status=status,
+                        headers=HeaderKeyDict(**self.headers),
                         request=self.req)
 
     def handle_account(self):
-        # project_name = 'test'
-        # project_id = '792079638c6441bca02071501f4eb273'
-
         if self.req.method == 'HEAD':
             return self.head_account()
 
@@ -84,43 +97,52 @@ class SwiftGCPDriver:
 
     def head_account(self):
         try:
-            bucket = self.client.get_bucket(self.account)
-            blobs = list(bucket.list_blobs())
-
-            containers = filter(is_container, blobs)
-            objects = filter(is_object, blobs)
+            account_bucket = self.client.get_bucket(self.account)
+            account_blobs = list(account_bucket.list_blobs())
+            containers = filter(is_container, account_blobs)
+            objects = filter(is_object, account_blobs)
         except Exception as err:
             log.error(err)
 
         headers = {
             'X-Account-Container-Count': len(containers),
             'X-Account-Object-Count': len(objects),
-            'X-Account-Bytes-Used': 0
+            'X-Account-Bytes-Used': blobs_size(account_blobs)
         }
 
         return self._default_response('', 204, headers)
 
     def get_account(self):
-        containers = [
-            {
-                'count': 0,
-                'bytes': 0,
-                'name': 'test_container',
-                'last_modified': "2021-03-22T19:30:10.500000"
-            }
-        ]
+        try:
+            account_bucket = self.client.get_bucket(self.account)
+            account_blobs = list(account_bucket.list_blobs())
+            containers = filter(is_container, account_blobs)
+            objects = filter(is_object, account_blobs)
+        except Exception as err:
+            log.error(err)
+
+        container_list = []
+        for item in containers:
+            folder_blobs = list(account_bucket.list_blobs(prefix=item.name))
+            container_list.append({
+                'count': len(folder_blobs) - 1,  # all blobs except main folder (container)
+                'bytes': blobs_size(folder_blobs),
+                'name': item.name.replace('/', ''),
+                'last_modified': item.updated.isoformat()
+            })
 
         headers = {
-            'X-Account-Container-Count': 1,
-            'X-Account-Object-Count': 0,
-            'X-Account-Bytes-Used': 0
+            'X-Account-Container-Count': len(container_list),
+            'X-Account-Object-Count': len(objects),
+            'X-Account-Bytes-Used': blobs_size(account_blobs)
         }
 
         status = 200
-        if self.req.params.get('marker'):
+        if self.req.params.get('marker'):  # TODO: pagination
+            container_list = []
             status = 204
 
-        return self._default_response(containers, status, headers)
+        return self._json_response(container_list, status, headers)
 
     def handle_container(self):
         if self.req.method == 'HEAD':
@@ -130,22 +152,55 @@ class SwiftGCPDriver:
             return self.get_container()
 
     def head_container(self):
+        try:
+            account_bucket = self.client.get_bucket(self.account)
+            container_blobs = list(account_bucket.list_blobs(prefix=self.container))
+            objects = filter(is_object, container_blobs)
+        except Exception as err:
+            log.error(err)
+
         headers = {
-            'X-Container-Object-Count': 0,
-            'X-Container-Bytes-Used': 0
+            'X-Container-Object-Count': len(objects),
+            'X-Container-Bytes-Used': blobs_size(objects)
         }
 
         return self._default_response('', 204, headers)
 
     def get_container(self):
+        try:
+            account_bucket = self.client.get_bucket(self.account)
+            blobs = list(account_bucket.list_blobs(prefix=self.container))
+            objects = filter(is_object, blobs)
+            pseudofolders = filter(is_pseudofolder, blobs)
+        except Exception as err:
+            log.error(err)
+
+        object_list = []
+        for item in (objects + pseudofolders):
+            object_list.append({
+                'name': item.name.replace(self.container + '/', ''),
+                'bytes': item.size,
+                'hash': item.md5_hash,
+                'content_type': item.content_type,
+                'last_modified': item.updated.isoformat()
+            })
+
         headers = {
-            'X-Container-Object-Count': 0,
-            'X-Container-Bytes-Used': 0
+            'X-Container-Object-Count': len(object_list),
+            'X-Container-Bytes-Used': blobs_size(objects)
         }
 
-        return self._default_response([], 200, headers)
+        status = 200
+        if self.req.params.get('marker'):  # TODO: pagination
+            container_list = []
+            status = 204
+
+        return self._json_response(object_list, status, headers)
 
     def handle_object(self):
+        if self.req.method == 'HEAD':
+            return self.head_object()
+
         if self.req.method == 'GET':
             return self.get_object()
 
@@ -155,31 +210,34 @@ class SwiftGCPDriver:
         if self.req.method == 'DELETE':
             return self.delete_object()
 
-    def get_object(self):
+    def head_object(self):
         bucket = self.client.get_bucket(self.account)
         obj = '/'.join([self.container, self.obj])
-        blob = bucket.blob(obj)
+        blob = bucket.get_blob(obj)
 
         if not blob.exists():
-            headers = {
-                'Content-Type': 'text/html; charset=UTF-8',
-                'x-request-id': str(uuid4())
-            }
-            return self._default_response('', 404, headers)
-
-        blob.get_iam_policy()
-        blob_in_string = blob.download_as_string()
-        blob_in_bytes = io.BytesIO(blob_in_string)
+            return self._default_response('', 404)
 
         headers = {
             'Content-Type': blob.content_type,
-            'Accept-Ranges': 'bytes',
-            'X-Object-Meta-Orig-Filename': self.obj,
-            'X-Timestamp': Timestamp.now().normal
+            'Etag': blob.etag
         }
-        return Response(body=blob_in_bytes.getvalue(), status=200,
-                        headers=HeaderKeyDict(**headers),
-                        request=self.req)
+
+        return self._default_response('', 204, headers)
+
+    def get_object(self):
+        bucket = self.client.get_bucket(self.account)
+        obj = '/'.join([self.container, self.obj])
+        blob = bucket.get_blob(obj)
+
+        if not blob.exists():
+            return self._default_response('', 404)
+
+        headers = {
+            'Content-Type': blob.content_type,
+        }
+
+        return self._default_response(blob.download_as_bytes(), 200, headers)
 
     def put_object(self):
         bucket = self.client.get_bucket(self.account)
@@ -190,30 +248,19 @@ class SwiftGCPDriver:
         blob.upload_from_file(blob_in_bytes, content_type=content_type)
 
         headers = {
-            'Content-Type': 'text/html; charset=UTF-8',
             'Etag': blob.etag
         }
-        return Response(body='', status=201,
-                        headers=HeaderKeyDict(**headers),
-                        request=self.req)
+
+        return self._default_response('', 201, headers)
 
     def delete_object(self):
         bucket = self.client.get_bucket(self.account)
         obj = '/'.join([self.container, self.obj])
-        blob = bucket.blob(obj)
+        blob = bucket.get_blob(obj)
 
         if not blob.exists():
-            headers = {
-                'Content-Type': 'text/html; charset=UTF-8',
-                'x-request-id': str(uuid4())
-            }
-            return self._default_response('', 404, headers)
+            return self._default_response('', 404)
 
         blob.delete()
 
-        headers = {
-            'Content-Type': 'text/html; charset=UTF-8'
-        }
-        return Response(body='', status=204,
-                        headers=HeaderKeyDict(**headers),
-                        request=self.req)
+        return self._default_response('', 204)
