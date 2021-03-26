@@ -25,7 +25,8 @@ def create_app():
             'X-Account-Object-Count': 0,
             'Accept-Ranges': 'bytes',
             'X-Timestamp': '1616116845',
-            'X-Account-Meta-Cloud': 'gcp'
+            'X-Account-Meta-Cloud': 'gcp',
+            'X-Account-Meta-Temp-Url-Key': 'secret'
         })
 
         return resp

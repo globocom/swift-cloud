@@ -134,7 +134,8 @@ class SwiftGCPDriver(BaseDriver):
         headers = {
             'X-Account-Container-Count': len(container_list),
             'X-Account-Object-Count': len(objects),
-            'X-Account-Bytes-Used': blobs_size(account_blobs)
+            'X-Account-Bytes-Used': blobs_size(account_blobs),
+            'X-Account-Meta-Temp-Url-Key': 'secret'
         }
 
         status = 200
@@ -187,7 +188,8 @@ class SwiftGCPDriver(BaseDriver):
 
         headers = {
             'X-Container-Object-Count': len(object_list),
-            'X-Container-Bytes-Used': blobs_size(objects)
+            'X-Container-Bytes-Used': blobs_size(objects),
+            'X-Container-Meta-Temp-Url-Key': 'secret'
         }
 
         status = 200
