@@ -1,6 +1,7 @@
 import logging
 
 from swift.common.swob import Request
+from swift.common.utils import split_path
 from swift_cloud.drivers.gcp import SwiftGCPDriver
 from swift.proxy.controllers.base import get_account_info
 
@@ -25,6 +26,17 @@ class SwiftCloudMiddleware(object):
         return driver.response()
 
     def __call__(self, environ, start_response):
+        try:
+            (version, account, container, obj) = \
+                split_path(environ['PATH_INFO'], 2, 4, True)
+        except ValueError as err:
+            print(err)
+            return self.app(environ, start_response)
+
+        if 'swift.authorize' not in environ:
+            self.log.info('No authentication, skipping swift_cloud')
+            return self.app(environ, start_response)
+
         req = Request(environ)
 
         account_info = get_account_info(environ, self.app)
