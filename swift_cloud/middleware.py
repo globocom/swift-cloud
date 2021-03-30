@@ -30,7 +30,6 @@ class SwiftCloudMiddleware(object):
             (version, account, container, obj) = \
                 split_path(environ['PATH_INFO'], 2, 4, True)
         except ValueError as err:
-            print(err)
             return self.app(environ, start_response)
 
         if 'swift.authorize' not in environ:
