@@ -6,6 +6,7 @@ from uuid import uuid4
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
 from swift.common.header_key_dict import HeaderKeyDict
+from swift.common.exceptions import ChunkReadError
 
 from google.cloud import storage
 from google.oauth2 import service_account
@@ -246,8 +247,29 @@ class SwiftGCPDriver(BaseDriver):
         obj = '/'.join([self.container, self.obj])
         blob = bucket.blob(obj)
         content_type = self.req.headers.get('Content-Type')
-        blob_in_bytes = io.BytesIO(self.req.body)
-        blob.upload_from_file(blob_in_bytes, content_type=content_type)
+
+        # blob_in_bytes = io.BytesIO(self.req.body)
+        # blob.upload_from_file(blob_in_bytes, content_type=content_type)
+
+        READ_CHUNK_SIZE = 4096
+
+        def reader():
+            try:
+                return self.req.environ['wsgi.input'].read(READ_CHUNK_SIZE)
+            except (ValueError, IOError) as e:
+                raise ChunkReadError(str(e))
+
+        data_source = iter(reader, b'')
+        obj_data = b''
+
+        while True:
+            try:
+                chunk = next(data_source)
+            except StopIteration:
+                break
+            obj_data += chunk
+
+        blob.upload_from_string(obj_data, content_type=content_type)
 
         headers = {
             'Etag': blob.etag
