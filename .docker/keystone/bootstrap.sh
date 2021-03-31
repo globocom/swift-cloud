@@ -72,13 +72,12 @@ create_project Vault
 create_user u_vault u_vault Vault
 create_role_assign u_vault Vault admin
 create_role_assign u_vault Vault swiftoperator
+create_role_assign u_vault Vault ResellerAdmin
 
 # test project and user
 create_project test
 create_user u_test u_test test
-create_user u_vault_test u_vault_test test
 create_role_assign u_test test swiftoperator
-create_role_assign u_vault_test test swiftoperator
 
 # Restart uwsgi
 pkill uwsgi
