@@ -36,7 +36,7 @@ services:
     volumes:
       - .docker/fake_swift:/home/app
       - .:/home/swift_cloud
-      - ~/keys/custeio-infra-d14bf957b64c.json:/tmp/gcp/credentials.json
+      - ~/keys/gglobo-storm-dev-qa-b1d55d455cea.json:/tmp/gcp/credentials.json
     entrypoint: bash -c "pip install -e /home/swift_cloud && ./run"
     ports:
       - 8080:8080
