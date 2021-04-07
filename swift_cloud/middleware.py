@@ -22,7 +22,8 @@ class SwiftCloudMiddleware(object):
 
     def gcp_handler(self, req):
         credentials_path = self.conf.get('gcp_credentials')
-        driver = SwiftGCPDriver(req, credentials_path)
+        max_results = int(self.conf.get('max_results'))
+        driver = SwiftGCPDriver(req, credentials_path, max_results)
         return driver.response()
 
     def __call__(self, environ, start_response):

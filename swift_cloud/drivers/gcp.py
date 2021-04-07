@@ -40,9 +40,10 @@ def blobs_size(blob_list):
 
 class SwiftGCPDriver(BaseDriver):
 
-    def __init__(self, req, credentials_path):
+    def __init__(self, req, credentials_path, max_results):
         self.req = req
         self.client = self._get_client(credentials_path)
+        self.max_results = max_results
 
         self.account = None
         self.container = None
@@ -130,7 +131,7 @@ class SwiftGCPDriver(BaseDriver):
     def get_account(self):
         try:
             buckets = list(
-                self.client.list_buckets(prefix=self.project_id))
+                self.client.list_buckets(prefix=self.project_id, max_results=self.max_results))
         except Exception as err:
             log.error(err)
             return self._error_response(err)
