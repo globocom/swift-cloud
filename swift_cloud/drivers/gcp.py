@@ -40,11 +40,14 @@ def blobs_size(blob_list):
 
 class SwiftGCPDriver(BaseDriver):
 
-    def __init__(self, req, app, credentials_path, max_results):
+    def __init__(self, req, account_info, app, conf):
         self.req = req
+        self.account_info = account_info
         self.app = app
-        self.client = self._get_client(credentials_path)
-        self.max_results = max_results
+        self.conf = conf
+
+        self.max_results = int(conf.get('max_results'))
+        self.client = self._get_client()
 
         self.account = None
         self.container = None
@@ -77,7 +80,8 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response(b'Invalid request path', 500)
 
-    def _get_client(self, credentials_path):
+    def _get_client(self):
+        credentials_path = self.conf.get('gcp_credentials')
         credentials = service_account.Credentials.from_service_account_file(credentials_path)
         return storage.Client(credentials=credentials)
 
@@ -109,7 +113,8 @@ class SwiftGCPDriver(BaseDriver):
             return self.get_account()
 
         if self.req.method == 'POST':
-            return self.post_account()
+            """All POST requests for Account will be forwarded"""
+            return self.app
 
     def head_account(self):
         try:
@@ -130,12 +135,18 @@ class SwiftGCPDriver(BaseDriver):
             'X-Account-Bytes-Used': blobs_size(objects)
         }
 
+        account_meta = self.account_info.get('meta')
+        for key in account_meta:
+            new_key = 'X-Account-Meta-{}'.format(key)
+            headers[new_key] = account_meta[key]
+
         return self._default_response('', 204, headers)
 
     def get_account(self):
         try:
             buckets = list(
-                self.client.list_buckets(prefix=self.project_id, max_results=self.max_results))
+                self.client.list_buckets(prefix=self.project_id,
+                                         max_results=self.max_results))
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -154,9 +165,13 @@ class SwiftGCPDriver(BaseDriver):
         headers = {
             'X-Account-Container-Count': len(containers),
             'X-Account-Object-Count': len(total_blobs),
-            'X-Account-Bytes-Used': blobs_size(total_blobs),
-            'X-Account-Meta-Temp-Url-Key': 'secret'
+            'X-Account-Bytes-Used': blobs_size(total_blobs)
         }
+
+        account_meta = self.account_info.get('meta')
+        for key in account_meta:
+            new_key = 'X-Account-Meta-{}'.format(key)
+            headers[new_key] = account_meta[key]
 
         status = 200
         if self.req.params.get('marker'):  # TODO: pagination
@@ -164,10 +179,6 @@ class SwiftGCPDriver(BaseDriver):
             status = 204
 
         return self._json_response(containers, status, headers)
-
-    def post_account(self):
-        """All POST requests for Account will be forwarded"""
-        return self.app
 
     def handle_container(self):
         if self.req.method == 'HEAD':
@@ -217,8 +228,7 @@ class SwiftGCPDriver(BaseDriver):
 
         headers = {
             'X-Container-Object-Count': len(objects),
-            'X-Container-Bytes-Used': blobs_size(blobs),
-            'X-Container-Meta-Temp-Url-Key': 'secret'
+            'X-Container-Bytes-Used': blobs_size(blobs)
         }
 
         status = 200
