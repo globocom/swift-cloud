@@ -31,6 +31,18 @@ def create_app():
 
         return resp
 
+    @app.route('/v1/<account>', methods=['POST'])
+    def post_account(account):
+        resp = make_response()
+        resp.status_code = 204
+        resp.headers.update({
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Timestamp': '1616116845'
+        })
+
+        return resp
+
+
     @app.route('/v1/<account>/<container>')
     def get_container(account, container):
         resp = make_response(jsonify([]))

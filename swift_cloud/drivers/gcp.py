@@ -40,8 +40,9 @@ def blobs_size(blob_list):
 
 class SwiftGCPDriver(BaseDriver):
 
-    def __init__(self, req, credentials_path, max_results):
+    def __init__(self, req, app, credentials_path, max_results):
         self.req = req
+        self.app = app
         self.client = self._get_client(credentials_path)
         self.max_results = max_results
 
@@ -107,6 +108,9 @@ class SwiftGCPDriver(BaseDriver):
         if self.req.method == 'GET':
             return self.get_account()
 
+        if self.req.method == 'POST':
+            return self.post_account()
+
     def head_account(self):
         try:
             bucket_list = list(
@@ -160,6 +164,10 @@ class SwiftGCPDriver(BaseDriver):
             status = 204
 
         return self._json_response(containers, status, headers)
+
+    def post_account(self):
+        """All POST requests for Account will be forwarded"""
+        return self.app
 
     def handle_container(self):
         if self.req.method == 'HEAD':
@@ -289,9 +297,6 @@ class SwiftGCPDriver(BaseDriver):
         bucket = self.client.get_bucket(self.bucket_name)
         blob = bucket.blob(self.obj)
         content_type = self.req.headers.get('Content-Type')
-
-        # blob_in_bytes = io.BytesIO(self.req.body)
-        # blob.upload_from_file(blob_in_bytes, content_type=content_type)
 
         def reader():
             try:

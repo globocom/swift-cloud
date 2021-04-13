@@ -2,8 +2,9 @@ import logging
 
 from swift.common.swob import Request
 from swift.common.utils import split_path
-from swift_cloud.drivers.gcp import SwiftGCPDriver
 from swift.proxy.controllers.base import get_account_info
+
+from swift_cloud.drivers.gcp import SwiftGCPDriver
 
 log = logging.getLogger(__name__)
 
@@ -20,10 +21,10 @@ class SwiftCloudMiddleware(object):
         self.conf = conf
         self.providers = conf.get('cloud_providers').split()
 
-    def gcp_handler(self, req):
+    def gcp_handler(self, req, app=None):
         credentials_path = self.conf.get('gcp_credentials')
         max_results = int(self.conf.get('max_results'))
-        driver = SwiftGCPDriver(req, credentials_path, max_results)
+        driver = SwiftGCPDriver(req, app, credentials_path, max_results)
         return driver.response()
 
     def __call__(self, environ, start_response):
@@ -34,21 +35,21 @@ class SwiftCloudMiddleware(object):
             return self.app(environ, start_response)
 
         if 'swift.authorize' not in environ:
-            self.log.info('No authentication, skipping swift_cloud')
+            log.info('No authentication, skipping swift_cloud')
             return self.app(environ, start_response)
-
-        req = Request(environ)
 
         account_info = get_account_info(environ, self.app)
         cloud_name = account_info['meta'].get('cloud')
 
         if cloud_name and cloud_name in self.providers:
+            req = Request(environ)
             aresp = environ['swift.authorize'](req)
+
             if aresp:
                 return aresp(environ, start_response)
 
             if cloud_name == 'gcp':
-                return self.gcp_handler(req)(environ, start_response)
+                return self.gcp_handler(req, self.app)(environ, start_response)
 
         return self.app(environ, start_response)
 
