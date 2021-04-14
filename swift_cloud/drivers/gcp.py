@@ -179,6 +179,9 @@ class SwiftGCPDriver(BaseDriver):
         if self.req.method == 'PUT':
             return self.put_container()
 
+        if self.req.method == 'POST':
+            return self.post_container()
+
         if self.req.method == 'DELETE':
             return self.delete_container()
 
@@ -237,6 +240,48 @@ class SwiftGCPDriver(BaseDriver):
             return self._error_response(err)
 
         return self._default_response('', 201)
+
+    def post_container(self):
+        try:
+            bucket = self.client.get_bucket(self.bucket_name)
+        except Exception as err:
+            log.error(err)
+            return self._error_response(err)
+
+        labels = bucket.labels
+
+        for item in self.req.headers.iteritems():
+            key, value = item
+            prefix = key.split('X-Container-Meta-')
+
+            if len(prefix) > 1:
+                meta = "x-goog-meta-%s" % prefix[1].lower()
+                labels[meta] = item[1].lower()
+                continue
+
+            prefix = key.split('X-Remove-Container-Meta-')
+
+            if len(prefix) > 1:
+                meta = "x-goog-meta-%s" % prefix[1].lower()
+                del labels[meta]
+                continue
+            # import ipdb;ipdb.set_trace()
+            if key == 'X-Container-Read':
+                if value == '.r:*':
+                    # bucket.make_public(recursive=True, future=True, client=self.client)
+                    print('make_public')
+            elif key == 'X-Remove-Container-Read':
+                # bucket.make_private(recursive=True, future=True, client=self.client)
+                print('make_private')
+            elif key == 'X-Versions-Location' or key == 'X-History-Location':
+                bucket.versioning_enabled = True
+            elif key == 'X-Remove-Versions-Location' or key == 'X-Remove-History-Location':
+                bucket.versioning_enabled = False
+
+        bucket.labels = labels
+        bucket.patch()
+
+        return self._default_response('', 204)
 
     def delete_container(self):
         try:
