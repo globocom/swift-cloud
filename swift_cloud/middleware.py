@@ -21,10 +21,8 @@ class SwiftCloudMiddleware(object):
         self.conf = conf
         self.providers = conf.get('cloud_providers').split()
 
-    def gcp_handler(self, req, app=None):
-        credentials_path = self.conf.get('gcp_credentials')
-        max_results = int(self.conf.get('max_results'))
-        driver = SwiftGCPDriver(req, app, credentials_path, max_results)
+    def gcp_handler(self, req, account_info):
+        driver = SwiftGCPDriver(req, account_info, self.app, self.conf)
         return driver.response()
 
     def __call__(self, environ, start_response):
@@ -49,7 +47,9 @@ class SwiftCloudMiddleware(object):
                 return aresp(environ, start_response)
 
             if cloud_name == 'gcp':
-                return self.gcp_handler(req, self.app)(environ, start_response)
+                handler = self.gcp_handler(req, account_info)
+
+            return handler(environ, start_response)
 
         return self.app(environ, start_response)
 
