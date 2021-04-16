@@ -251,7 +251,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def post_container(self):
         try:
-            bucket = self.client.get_bucket(self.bucket_name)
+            bucket = self.client.get_bucket(self.account)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -273,7 +273,7 @@ class SwiftGCPDriver(BaseDriver):
                 meta = "x-goog-meta-%s" % prefix[1].lower()
                 del labels[meta]
                 continue
-            # import ipdb;ipdb.set_trace()
+
             if key == 'X-Container-Read':
                 if value == '.r:*':
                     # bucket.make_public(recursive=True, future=True, client=self.client)
@@ -293,7 +293,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def delete_container(self):
         try:
-            bucket = self.client.get_bucket(self.bucket_name)
+            bucket = self.client.get_bucket(self.account)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -319,8 +319,9 @@ class SwiftGCPDriver(BaseDriver):
             return self.delete_object()
 
     def head_object(self):
-        bucket = self.client.get_bucket(self.bucket_name)
-        blob = bucket.get_blob(self.obj)
+        bucket = self.client.get_bucket(self.account)
+        obj_path = get_object_path(self.container, self.obj)
+        blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
             return self._default_response('', 404)
@@ -333,8 +334,9 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204, headers)
 
     def get_object(self):
-        bucket = self.client.get_bucket(self.bucket_name)
-        blob = bucket.get_blob(self.obj)
+        bucket = self.client.get_bucket(self.account)
+        obj_path = get_object_path(self.container, self.obj)
+        blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
             return self._default_response('', 404)
@@ -347,8 +349,9 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response(blob.download_as_bytes(), 200, headers)
 
     def put_object(self):
-        bucket = self.client.get_bucket(self.bucket_name)
-        blob = bucket.blob(self.obj)
+        bucket = self.client.get_bucket(self.account)
+        obj_path = get_object_path(self.container, self.obj)
+        blob = bucket.blob(obj_path)
         content_type = self.req.headers.get('Content-Type')
 
         def reader():
