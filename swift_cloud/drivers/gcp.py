@@ -140,6 +140,10 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204, headers)
 
     def get_account(self):
+        containers = []
+        objects = []
+        account_blobs = []
+
         try:
             account_bucket = self.client.get_bucket(self.account)
             account_blobs = list(account_bucket.list_blobs())
@@ -196,7 +200,8 @@ class SwiftGCPDriver(BaseDriver):
     def head_container(self):
         try:
             account_bucket = self.client.get_bucket(self.account)
-            container_blobs = list(account_bucket.list_blobs(prefix=self.container))
+            prefix = self.container + '/'
+            container_blobs = list(account_bucket.list_blobs(prefix=prefix))
             objects = filter(is_object, container_blobs)
         except Exception as err:
             log.error(err)
@@ -211,7 +216,8 @@ class SwiftGCPDriver(BaseDriver):
     def get_container(self):
         try:
             account_bucket = self.client.get_bucket(self.account)
-            blobs = list(account_bucket.list_blobs(prefix=self.container))
+            prefix = self.container + '/'
+            blobs = list(account_bucket.list_blobs(prefix=prefix))
             objects = filter(is_object, blobs)
             pseudofolders = filter(is_pseudofolder, blobs)
         except Exception as err:
@@ -241,11 +247,13 @@ class SwiftGCPDriver(BaseDriver):
 
     def put_container(self):
         try:
-            bucket = self.client.create_bucket(self.bucket_name,
-                                               location='SOUTHAMERICA-EAST1')
+            bucket = self.client.get_bucket(self.account)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
+
+        blob = bucket.blob(self.container + '/')
+        blob.upload_from_string('', content_type='application/x-www-form-urlencoded;charset=UTF-8')
 
         return self._default_response('', 201)
 
@@ -301,7 +309,11 @@ class SwiftGCPDriver(BaseDriver):
         if not bucket.exists():
             return self._default_response('', 404)
 
-        bucket.delete()
+        prefix = self.container + '/'
+        blobs = list(bucket.list_blobs(prefix=prefix))
+
+        for blob in blobs:
+            blob.delete()
 
         return self._default_response('', 204)
 
