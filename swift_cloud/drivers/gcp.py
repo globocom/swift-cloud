@@ -9,11 +9,14 @@ from swift.common.header_key_dict import HeaderKeyDict
 from swift.common.exceptions import ChunkReadError
 
 from google.cloud import storage
+from google.cloud.exceptions import NotFound
 from google.oauth2 import service_account
 
 from swift_cloud.drivers.base import BaseDriver
 
 log = logging.getLogger(__name__)
+
+BUCKET_LOCATION = 'SOUTHAMERICA-EAST1'
 
 
 def is_container(blob):
@@ -37,12 +40,14 @@ def blobs_size(blob_list):
         size += blob.size
     return size
 
+
 def get_object_path(container, obj):
     path = []
     if container:
         path.append(container)
     path.append(obj)
     return "/".join(path)
+
 
 class SwiftGCPDriver(BaseDriver):
 
@@ -122,6 +127,7 @@ class SwiftGCPDriver(BaseDriver):
             return self.app
 
     def head_account(self):
+        account_blobs, containers, objects = [], [], []
         try:
             account_bucket = self.client.get_bucket(self.account)
             account_blobs = list(account_bucket.list_blobs())
@@ -139,10 +145,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204, headers)
 
     def get_account(self):
-        containers = []
-        objects = []
-        account_blobs = []
-
+        account_blobs, containers, objects = [], [], []
         try:
             account_bucket = self.client.get_bucket(self.account)
             account_blobs = list(account_bucket.list_blobs())
@@ -247,12 +250,15 @@ class SwiftGCPDriver(BaseDriver):
     def put_container(self):
         try:
             bucket = self.client.get_bucket(self.account)
+        except NotFound:
+            bucket = self.client.create_bucket(self.account,
+                                               location=BUCKET_LOCATION)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
 
         blob = bucket.blob(self.container + '/')
-        blob.upload_from_string('', content_type='application/x-www-form-urlencoded;charset=UTF-8')
+        blob.upload_from_string('', content_type='application/directory;charset=UTF-8')
 
         return self._default_response('', 201)
 
