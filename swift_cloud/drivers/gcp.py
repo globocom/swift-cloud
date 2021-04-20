@@ -75,7 +75,6 @@ class SwiftGCPDriver(BaseDriver):
         self.obj = obj
 
         self.project_id = self.account.replace('auth_', '')
-        self.bucket_name = '{}_{}'.format(self.project_id, container)
 
         if obj and container and account:
             return self.handle_object()
@@ -264,7 +263,12 @@ class SwiftGCPDriver(BaseDriver):
             log.error(err)
             return self._error_response(err)
 
-        labels = bucket.labels
+        blob = bucket.get_blob(self.container + '/')
+
+        if not blob:
+            return self._default_response('', 404)
+
+        metadata = blob.metadata or {}
 
         for item in self.req.headers.iteritems():
             key, value = item
@@ -272,30 +276,41 @@ class SwiftGCPDriver(BaseDriver):
 
             if len(prefix) > 1:
                 meta = "x-goog-meta-%s" % prefix[1].lower()
-                labels[meta] = item[1].lower()
+                metadata[meta] = item[1].lower()
                 continue
 
             prefix = key.split('X-Remove-Container-Meta-')
 
             if len(prefix) > 1:
                 meta = "x-goog-meta-%s" % prefix[1].lower()
-                del labels[meta]
+                if metadata.get(meta):
+                  del metadata[meta]
                 continue
 
             if key == 'X-Container-Read':
                 if value == '.r:*':
                     # bucket.make_public(recursive=True, future=True, client=self.client)
-                    print('make_public')
-            elif key == 'X-Remove-Container-Read':
-                # bucket.make_private(recursive=True, future=True, client=self.client)
-                print('make_private')
-            elif key == 'X-Versions-Location' or key == 'X-History-Location':
-                bucket.versioning_enabled = True
-            elif key == 'X-Remove-Versions-Location' or key == 'X-Remove-History-Location':
-                bucket.versioning_enabled = False
+                    metadata["x-goog-meta-read"] = value
+                    continue
 
-        bucket.labels = labels
-        bucket.patch()
+            if key == 'X-Remove-Container-Read':
+                # bucket.make_private(recursive=True, future=True, client=self.client)
+                if metadata.get('x-goog-meta-read'):
+                    del metadata["x-goog-meta-read"]
+                continue
+
+            if key == 'X-Versions-Location' or key == 'X-History-Location':
+                bucket.versioning_enabled = True
+                bucket.patch()
+                continue
+
+            if key == 'X-Remove-Versions-Location' or key == 'X-Remove-History-Location':
+                bucket.versioning_enabled = False
+                bucket.patch()
+                continue
+
+        blob.metadata = metadata
+        blob.patch()
 
         return self._default_response('', 204)
 
