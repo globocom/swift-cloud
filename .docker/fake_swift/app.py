@@ -42,7 +42,6 @@ def create_app():
 
         return resp
 
-
     @app.route('/v1/<account>/<container>')
     def get_container(account, container):
         resp = make_response(jsonify([]))

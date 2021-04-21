@@ -251,8 +251,9 @@ class SwiftGCPDriver(BaseDriver):
         try:
             bucket = self.client.get_bucket(self.account)
         except NotFound:
-            bucket = self.client.create_bucket(self.account,
-                                               location=BUCKET_LOCATION)
+            bucket = self.client.create_bucket(self.account, location=BUCKET_LOCATION)
+            bucket.iam_configuration.uniform_bucket_level_access_enabled = False
+            bucket.patch()
         except Exception as err:
             log.error(err)
             return self._error_response(err)

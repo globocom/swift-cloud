@@ -46,6 +46,7 @@ class SwiftCloudMiddleware(object):
             if aresp:
                 return aresp(environ, start_response)
 
+            handler = self.app
             if cloud_name == 'gcp':
                 handler = self.gcp_handler(req, account_info)
 
