@@ -51,3 +51,37 @@ class SwiftGCPDriverTestCase(TestCase):
     def test_call_object_handler(self, mock_handle_object):
         driver = self._driver('/v1/account/container/object').response()
         mock_handle_object.assert_called_once()
+
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.head_account')
+    def test_call_head_account(self, mock_head_account):
+        res = self._driver('/v1/account', 'HEAD').response()
+        mock_head_account.assert_called_once()
+
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.get_account')
+    def test_call_get_account(self, mock_get_account):
+        res = self._driver('/v1/account', 'GET').response()
+        mock_get_account.assert_called_once()
+
+    def test_post_account_foward_request_to_next_app(self):
+        res = self._driver('/v1/account', 'POST').response()
+        self.assertIsInstance(res, FakeApp)
+
+    def test_head_account_returns_a_204_status_code(self):
+        res = self._driver('/v1/account', 'HEAD').response()
+        self.assertEquals(res.status_int, 204)
+
+    def test_head_account_returns_x_account_headers(self):
+        res = self._driver('/v1/account', 'HEAD').response()
+        self.assertIn('X-Account-Container-Count', res.headers)
+        self.assertIn('X-Account-Object-Count', res.headers)
+        self.assertIn('X-Account-Bytes-Used', res.headers)
+        self.assertIn('X-Account-Meta-Cloud', res.headers)
+
+    def test_get_account_returns_account_headers_and_container_list_as_json(self):
+        res = self._driver('/v1/account', 'GET').response()
+        self.assertIn('X-Account-Container-Count', res.headers)
+        self.assertIn('X-Account-Object-Count', res.headers)
+        self.assertIn('X-Account-Bytes-Used', res.headers)
+        self.assertIn('X-Account-Meta-Cloud', res.headers)
+        self.assertEquals(res.content_type, 'application/json')
+        self.assertEquals(res.body, '[]')

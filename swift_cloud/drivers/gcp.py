@@ -133,12 +133,18 @@ class SwiftGCPDriver(BaseDriver):
             objects = filter(is_object, account_blobs)
         except Exception as err:
             log.error(err)
+            return self._error_response(err)
 
         headers = {
             'X-Account-Container-Count': len(containers),
             'X-Account-Object-Count': len(objects),
             'X-Account-Bytes-Used': blobs_size(account_blobs)
         }
+
+        account_meta = self.account_info.get('meta')
+        for key in account_meta:
+            new_key = 'X-Account-Meta-{}'.format(key)
+            headers[new_key] = account_meta[key]
 
         return self._default_response('', 204, headers)
 
@@ -151,6 +157,7 @@ class SwiftGCPDriver(BaseDriver):
             objects = filter(is_object, account_blobs)
         except Exception as err:
             log.error(err)
+            return self._error_response(err)
 
         container_list = []
         for item in containers:
@@ -165,8 +172,7 @@ class SwiftGCPDriver(BaseDriver):
         headers = {
             'X-Account-Container-Count': len(container_list),
             'X-Account-Object-Count': len(objects),
-            'X-Account-Bytes-Used': blobs_size(account_blobs),
-            'X-Account-Meta-Temp-Url-Key': 'secret'
+            'X-Account-Bytes-Used': blobs_size(account_blobs)
         }
 
         account_meta = self.account_info.get('meta')
@@ -289,7 +295,7 @@ class SwiftGCPDriver(BaseDriver):
             if len(prefix) > 1:
                 meta = "x-goog-meta-%s" % prefix[1].lower()
                 if metadata.get(meta):
-                  del metadata[meta]
+                    del metadata[meta]
                 continue
 
             if key == 'X-Container-Read':
