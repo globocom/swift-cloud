@@ -10,7 +10,7 @@ from swift.common.exceptions import ChunkReadError
 
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
-from google.oauth2 import service_account
+from google.oauth2.service_account import Credentials
 
 from swift_cloud.drivers.base import BaseDriver
 
@@ -75,15 +75,13 @@ class SwiftGCPDriver(BaseDriver):
         version, account, container, obj = split_path(
             wsgi_to_str(self.req.path), 1, 4, True)
 
-        self.account = account.lower()
+        self.account = account.lower() if account else None
         self.container = container
         self.obj = obj
 
-        self.project_id = self.account.replace('auth_', '')
-
-        if obj and container and account:
+        if account and container and obj:
             return self.handle_object()
-        elif container and account:
+        elif account and container:
             return self.handle_container()
         elif account and not container and not obj:
             return self.handle_account()
@@ -92,7 +90,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def _get_client(self):
         credentials_path = self.conf.get('gcp_credentials')
-        credentials = service_account.Credentials.from_service_account_file(credentials_path)
+        credentials = Credentials.from_service_account_file(credentials_path)
         return storage.Client(credentials=credentials)
 
     def _default_response(self, body, status, headers={}):
