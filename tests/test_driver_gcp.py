@@ -52,6 +52,8 @@ class SwiftGCPDriverTestCase(TestCase):
         driver = self._driver('/v1/account/container/object').response()
         mock_handle_object.assert_called_once()
 
+    # Account tests
+
     @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.head_account')
     def test_call_head_account(self, mock_head_account):
         res = self._driver('/v1/account', 'HEAD').response()
@@ -85,3 +87,17 @@ class SwiftGCPDriverTestCase(TestCase):
         self.assertIn('X-Account-Meta-Cloud', res.headers)
         self.assertEquals(res.content_type, 'application/json')
         self.assertEquals(res.body, '[]')
+
+    # Container tests
+
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.head_container')
+    def test_call_head_container(self, mock_head_container):
+        res = self._driver('/v1/account/container', 'HEAD').response()
+        mock_head_container.assert_called_once()
+
+    # Object tests
+
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.head_object')
+    def test_call_head_object(self, mock_head_object):
+        res = self._driver('/v1/account/container/object', 'HEAD').response()
+        mock_head_object.assert_called_once()
