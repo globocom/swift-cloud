@@ -134,6 +134,26 @@ class SwiftGCPDriverTestCase(TestCase):
         res = self._driver('/v1/account/container', 'HEAD').response()
         mock_head_container.assert_called_once()
 
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.get_container')
+    def test_call_get_container(self, mock_get_container):
+        res = self._driver('/v1/account/container', 'GET').response()
+        mock_get_container.assert_called_once()
+
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.put_container')
+    def test_call_put_container(self, mock_put_container):
+        res = self._driver('/v1/account/container', 'PUT').response()
+        mock_put_container.assert_called_once()
+
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.post_container')
+    def test_call_post_container(self, mock_post_container):
+        res = self._driver('/v1/account/container', 'POST').response()
+        mock_post_container.assert_called_once()
+
+    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.delete_container')
+    def test_call_delete_container(self, mock_delete_container):
+        res = self._driver('/v1/account/container', 'DELETE').response()
+        mock_delete_container.assert_called_once()
+
     # Object tests
 
     @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.head_object')
