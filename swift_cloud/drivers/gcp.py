@@ -286,28 +286,28 @@ class SwiftGCPDriver(BaseDriver):
             prefix = key.split('X-Container-Meta-')
 
             if len(prefix) > 1:
-                meta = "x-goog-meta-%s" % prefix[1].lower()
+                meta = prefix[1].lower()
                 metadata[meta] = item[1].lower()
                 continue
 
             prefix = key.split('X-Remove-Container-Meta-')
 
             if len(prefix) > 1:
-                meta = "x-goog-meta-%s" % prefix[1].lower()
+                meta = prefix[1].lower()
                 if metadata.get(meta):
-                    del metadata[meta]
+                    metadata[meta] = None
                 continue
 
             if key == 'X-Container-Read':
                 if value == '.r:*':
                     # bucket.make_public(recursive=True, future=True, client=self.client)
-                    metadata["x-goog-meta-read"] = value
+                    metadata["read"] = value
                     continue
 
             if key == 'X-Remove-Container-Read':
                 # bucket.make_private(recursive=True, future=True, client=self.client)
-                if metadata.get('x-goog-meta-read'):
-                    del metadata["x-goog-meta-read"]
+                if metadata.get('read'):
+                    metadata["read"] = None
                 continue
 
             if key == 'X-Versions-Location' or key == 'X-History-Location':
