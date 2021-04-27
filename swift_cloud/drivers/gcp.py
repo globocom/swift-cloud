@@ -99,7 +99,7 @@ class SwiftGCPDriver(BaseDriver):
                         headers=HeaderKeyDict(**self.headers),
                         request=self.req)
 
-    def _json_response(self, body, status, headers):
+    def _json_response(self, body, status, headers={}):
         self.headers.update(headers)
         self.headers['Content-Type'] = 'application/json; charset=utf-8'
         return Response(body=json.dumps(body), status=status,
@@ -353,8 +353,68 @@ class SwiftGCPDriver(BaseDriver):
         if self.req.method == 'PUT':
             return self.put_object()
 
+        if self.req.method == 'POST':
+            return self.post_object()
+
         if self.req.method == 'DELETE':
             return self.delete_object()
+
+    def get_object_headers(self, blob):
+        headers = {
+            'Content-Type': blob.content_type,
+            'Etag': blob.etag
+        }
+
+        if blob.cache_control:
+            headers['Cache-Control'] = blob.cache_control
+
+        if blob.content_encoding:
+            headers['Content-Encoding'] = blob.content_encoding
+
+        if blob.content_disposition:
+            headers['Content-Disposition'] = blob.content_disposition
+
+        if blob.metadata:
+            for key, value in blob.metadata.items():
+                headers['X-Object-Meta-{}'.format(key)] = value
+
+        return headers
+
+    def update_object_headers(self, blob):
+        updated = False
+
+        cache_control = self.req.headers.get('cache-control')
+        if cache_control:
+            blob.cache_control = cache_control
+            updated = True
+
+        content_encoding = self.req.headers.get('content-encoding')
+        if content_encoding:
+            blob.content_encoding = content_encoding
+            updated = True
+
+        content_disposition = self.req.headers.get('content-disposition')
+        if content_disposition:
+            blob.content_disposition = content_disposition
+            updated = True
+
+        metadata = {}
+        meta_keys = filter(lambda x: 'x-object-meta' in x.lower(),
+                           self.req.headers.keys())
+
+        if blob.metadata:
+            for key in blob.metadata.keys():
+                metadata[key] = None
+
+        for item in meta_keys:
+            key = item.lower().split('x-object-meta-')[-1]
+            metadata[key] = self.req.headers.get(item)
+
+        if len(meta_keys):
+            blob.metadata = metadata
+            updated = True
+
+        return updated, blob
 
     def head_object(self):
         bucket = self.client.get_bucket(self.account)
@@ -364,10 +424,7 @@ class SwiftGCPDriver(BaseDriver):
         if not blob.exists():
             return self._default_response('', 404)
 
-        headers = {
-            'Content-Type': blob.content_type,
-            'Etag': blob.etag
-        }
+        headers = self.get_object_headers(blob)
 
         return self._default_response('', 204, headers)
 
@@ -379,12 +436,10 @@ class SwiftGCPDriver(BaseDriver):
         if not blob.exists():
             return self._default_response('', 404)
 
-        headers = {
-            'Content-Type': blob.content_type,
-            'Etag': blob.etag
-        }
+        headers = self.get_object_headers(blob)
 
-        return self._default_response(blob.download_as_bytes(), 200, headers)
+        return self._default_response(
+            blob.download_as_bytes(), 200, headers)
 
     def put_object(self):
         bucket = self.client.get_bucket(self.account)
@@ -408,13 +463,28 @@ class SwiftGCPDriver(BaseDriver):
                 break
             obj_data += chunk
 
+        _, blob = self.update_object_headers(blob)
+
         blob.upload_from_string(obj_data, content_type=content_type)
 
-        headers = {
-            'Etag': blob.etag
-        }
+        headers = self.get_object_headers(blob)
 
         return self._default_response('', 201, headers)
+
+    def post_object(self):
+        bucket = self.client.get_bucket(self.account)
+        obj_path = get_object_path(self.container, self.obj)
+        blob = bucket.get_blob(obj_path)
+
+        if not blob.exists():
+            return self._default_response('', 404)
+
+        updated, blob = self.update_object_headers(blob)
+
+        if updated:
+            blob.patch()
+
+        return self._default_response('', 202)  # Accepted
 
     def delete_object(self):
         bucket = self.client.get_bucket(self.account)
