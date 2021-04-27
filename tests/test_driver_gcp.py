@@ -14,9 +14,13 @@ class FakeBlob:
         self._exists = exists
         self.content_type = 'text/html'
         self.etag = 'etag'
+        self.metadata = None
 
     def exists(self):
         return self._exists
+
+    def patch(self):
+        return
 
 
 class FakeBucket:
@@ -29,6 +33,9 @@ class FakeBucket:
 
     def list_blobs(self, *args, **kwargs):
         return self.blobs
+
+    def patch(self):
+        return
 
 
 class FakeClient:
@@ -63,14 +70,18 @@ class SwiftGCPDriverTestCase(TestCase):
     def tearDown(self):
         patch.stopall()
 
-    def _driver(self, path, method='GET'):
+    def _driver(self, path, method='GET', headers=None):
         environ = {
             'PATH_INFO': path,
             'REQUEST_METHOD': method,
             'swift.authorize': lambda req: False
         }
-        return SwiftGCPDriver(Request(environ),
-            self.account_info, self.app, self.conf)
+        req = Request(environ)
+
+        if headers:
+            req.headers.update(headers)
+
+        return SwiftGCPDriver(req, self.account_info, self.app, self.conf)
 
     def test_invalid_request_path(self):
         res = self._driver('/invalid-path').response()
@@ -148,6 +159,36 @@ class SwiftGCPDriverTestCase(TestCase):
     def test_call_post_container(self, mock_post_container):
         res = self._driver('/v1/account/container', 'POST').response()
         mock_post_container.assert_called_once()
+
+    def test_post_container_add_custom_metadata(self):
+        headers = {"X-Container-Meta-Name": "teste"}
+        res = self._driver('/v1/account/container', 'POST', headers).response()
+        self.assertEquals(res.status_int, 204)
+
+    def test_post_container_del_custom_metadata(self):
+        headers = {"X-Remove-Container-Meta-Name": "x"}
+        res = self._driver('/v1/account/container', 'POST', headers).response()
+        self.assertEquals(res.status_int, 204)
+
+    def test_post_container_make_public(self):
+        headers = {"X-Container-Read": ".r:*"}
+        res = self._driver('/v1/account/container', 'POST', headers).response()
+        self.assertEquals(res.status_int, 204)
+
+    def test_post_container_make_private(self):
+        headers = {"X-Remove-Container-Read": "x"}
+        res = self._driver('/v1/account/container', 'POST', headers).response()
+        self.assertEquals(res.status_int, 204)
+
+    def test_post_container_add_versioning(self):
+        headers = {"X-Versions-Location": "x"}
+        res = self._driver('/v1/account/container', 'POST', headers).response()
+        self.assertEquals(res.status_int, 204)
+
+    def test_post_container_del_versioning(self):
+        headers = {"X-Remove-History-Location": "x"}
+        res = self._driver('/v1/account/container', 'POST', headers).response()
+        self.assertEquals(res.status_int, 204)
 
     @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.delete_container')
     def test_call_delete_container(self, mock_delete_container):
