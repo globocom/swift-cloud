@@ -15,6 +15,9 @@ class FakeBlob:
         self.content_type = 'text/html'
         self.etag = 'etag'
         self.metadata = None
+        self.cache_control = 10800
+        self.content_encoding = 'gzip'
+        self.content_disposition = 'inline'
 
     def exists(self):
         return self._exists
