@@ -10,11 +10,14 @@ class FakeApp:
 
 
 class FakeBlob:
+    def __call__(self, path):
+        return self
+
     def __init__(self, exists=True):
         self._exists = exists
         self.content_type = 'text/html'
         self.etag = 'etag'
-        self.metadata = None
+        self.metadata = {}
         self.cache_control = 10800
         self.content_encoding = 'gzip'
         self.content_disposition = 'inline'
@@ -23,13 +26,25 @@ class FakeBlob:
         return self._exists
 
     def patch(self):
-        return
+        pass
 
+    def download_as_bytes(self):
+        pass
+
+    def upload_from_string(self, obj_data, content_type):
+        pass
+
+    def delete(self):
+        pass
 
 class FakeBucket:
-    def __init__(self, blob=FakeBlob(), blobs=[]):
+    def __init__(self, blob=FakeBlob(), blobs=[], exists=True):
+        self._exists = exists
         self.blob = blob
         self.blobs = blobs
+
+    def exists(self):
+        return self._exists
 
     def get_blob(self, *args, **kwargs):
         return self.blob
@@ -38,7 +53,7 @@ class FakeBucket:
         return self.blobs
 
     def patch(self):
-        return
+        pass
 
 
 class FakeClient:
@@ -47,6 +62,19 @@ class FakeClient:
 
     def get_bucket(self, *args, **kwargs):
         return self.bucket
+
+
+class FakeReader(object):
+    def __init__(self):
+        self.bytes = b'test'
+
+    def read(self):
+        try:
+            x = self.bytes[0]
+        except Exception:
+            raise StopIteration
+        self.bytes = self.bytes[1:]
+        return x
 
 
 class SwiftGCPDriverTestCase(TestCase):
@@ -77,7 +105,8 @@ class SwiftGCPDriverTestCase(TestCase):
         environ = {
             'PATH_INFO': path,
             'REQUEST_METHOD': method,
-            'swift.authorize': lambda req: False
+            'swift.authorize': lambda req: False,
+            'wsgi.input': FakeReader()
         }
         req = Request(environ)
 
@@ -143,25 +172,17 @@ class SwiftGCPDriverTestCase(TestCase):
 
     # Container tests
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.head_container')
-    def test_call_head_container(self, mock_head_container):
+    def test_call_head_container(self):
         res = self._driver('/v1/account/container', 'HEAD').response()
-        mock_head_container.assert_called_once()
+        self.assertEquals(res.status_int, 204)
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.get_container')
-    def test_call_get_container(self, mock_get_container):
+    def test_call_get_container(self):
         res = self._driver('/v1/account/container', 'GET').response()
-        mock_get_container.assert_called_once()
+        self.assertEquals(res.status_int, 200)
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.put_container')
-    def test_call_put_container(self, mock_put_container):
+    def test_call_put_container(self):
         res = self._driver('/v1/account/container', 'PUT').response()
-        mock_put_container.assert_called_once()
-
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.post_container')
-    def test_call_post_container(self, mock_post_container):
-        res = self._driver('/v1/account/container', 'POST').response()
-        mock_post_container.assert_called_once()
+        self.assertEquals(res.status_int, 201)
 
     def test_post_container_add_custom_metadata(self):
         headers = {"X-Container-Meta-Name": "teste"}
@@ -193,37 +214,40 @@ class SwiftGCPDriverTestCase(TestCase):
         res = self._driver('/v1/account/container', 'POST', headers).response()
         self.assertEquals(res.status_int, 204)
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.delete_container')
-    def test_call_delete_container(self, mock_delete_container):
+    def test_call_delete_container(self):
         res = self._driver('/v1/account/container', 'DELETE').response()
-        mock_delete_container.assert_called_once()
+        self.assertEquals(res.status_int, 204)
 
     # Object tests
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.head_object')
-    def test_call_head_object(self, mock_head_object):
+    def test_call_head_object(self):
         res = self._driver('/v1/account/container/object', 'HEAD').response()
-        mock_head_object.assert_called_once()
+        self.assertEquals(res.headers.get('Content-Disposition'), 'inline')
+        self.assertEquals(res.status_int, 204)
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.get_object')
-    def test_call_get_object(self, mock_get_object):
+    @patch('google.cloud.storage')
+    def test_call_get_object(self, mock_storage):
         res = self._driver('/v1/account/container/object', 'GET').response()
-        mock_get_object.assert_called_once()
+        self.assertEquals(res.status_int, 200)
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.put_object')
-    def test_call_put_object(self, mock_put_object):
+    def test_call_put_object(self):
         res = self._driver('/v1/account/container/object', 'PUT').response()
-        mock_put_object.assert_called_once()
+        self.assertEquals(res.status_int, 201)
 
     @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.post_object')
     def test_call_post_object(self, mock_post_object):
         res = self._driver('/v1/account/container/object', 'POST').response()
         mock_post_object.assert_called_once()
 
-    @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.delete_object')
-    def test_call_delete_object(self, mock_delete_object):
+    def test_call_post_object_with_headers(self):
+        headers = {"X-Object-Meta-Name": "teste", "Cache-Control": 1000, 
+            "Content-Encoding": "gzip", "Content-Disposition": "attachment"}
+        res = self._driver('/v1/account/container/object', 'POST', headers).response()
+        self.assertEquals(res.status_int, 202)
+
+    def test_call_delete_object_test(self):
         res = self._driver('/v1/account/container/object', 'DELETE').response()
-        mock_delete_object.assert_called_once()
+        self.assertEquals(res.status_int, 204)
 
     def test_head_object_returns_204_status_code(self):
         res = self._driver('/v1/account/container/object', 'HEAD').response()
