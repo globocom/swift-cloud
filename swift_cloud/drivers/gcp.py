@@ -41,14 +41,6 @@ def blobs_size(blob_list):
     return size
 
 
-def get_object_path(container, obj):
-    path = []
-    if container:
-        path.append(container)
-    path.append(obj)
-    return "/".join(path)
-
-
 class SwiftGCPDriver(BaseDriver):
 
     def __init__(self, req, account_info, app, conf):
@@ -211,6 +203,7 @@ class SwiftGCPDriver(BaseDriver):
             objects = filter(is_object, container_blobs)
         except Exception as err:
             log.error(err)
+            return self._error_response(err)
 
         headers = {
             'X-Container-Object-Count': len(objects),
@@ -228,6 +221,7 @@ class SwiftGCPDriver(BaseDriver):
             pseudofolders = filter(is_pseudofolder, blobs)
         except Exception as err:
             log.error(err)
+            return self._error_response(err)
 
         object_list = []
         for item in (objects + pseudofolders):
@@ -418,7 +412,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def head_object(self):
         bucket = self.client.get_bucket(self.account)
-        obj_path = get_object_path(self.container, self.obj)
+        obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
@@ -430,7 +424,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def get_object(self):
         bucket = self.client.get_bucket(self.account)
-        obj_path = get_object_path(self.container, self.obj)
+        obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
@@ -443,7 +437,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def put_object(self):
         bucket = self.client.get_bucket(self.account)
-        obj_path = get_object_path(self.container, self.obj)
+        obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.blob(obj_path)
         content_type = self.req.headers.get('Content-Type')
 
@@ -473,7 +467,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def post_object(self):
         bucket = self.client.get_bucket(self.account)
-        obj_path = get_object_path(self.container, self.obj)
+        obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
@@ -488,7 +482,7 @@ class SwiftGCPDriver(BaseDriver):
 
     def delete_object(self):
         bucket = self.client.get_bucket(self.account)
-        obj_path = get_object_path(self.container, self.obj)
+        obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
