@@ -1,3 +1,4 @@
+from datetime import datetime
 from mock import patch, Mock
 from unittest import TestCase
 from swift.common.swob import Request
@@ -22,7 +23,7 @@ class FakeBlob:
         self.name = None
         self.size = None
         self.md5_hash = None
-        self.updated = None
+        self.updated = datetime.now()
         self.content_type = None
         self.etag = None
         self.metadata = {}
@@ -364,7 +365,7 @@ class SwiftGCPDriverTestCase(TestCase):
         mock_post_object.assert_called_once()
 
     def test_call_post_object_with_headers(self):
-        headers = {"X-Object-Meta-Name": "teste", "Cache-Control": 1000, 
+        headers = {"X-Object-Meta-Name": "teste", "Cache-Control": 1000,
             "Content-Encoding": "gzip", "Content-Disposition": "attachment"}
         res = self._driver('/v1/account/container/object', 'POST', headers).response()
         self.assertEquals(res.status_int, 202)
