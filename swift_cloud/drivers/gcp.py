@@ -356,7 +356,8 @@ class SwiftGCPDriver(BaseDriver):
     def get_object_headers(self, blob):
         headers = {
             'Content-Type': blob.content_type,
-            'Etag': blob.etag
+            'Etag': blob.etag,
+            'Last-Modified': blob.updated.isoformat()
         }
 
         if blob.cache_control:
