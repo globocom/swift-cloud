@@ -1,12 +1,9 @@
-from datetime import datetime
+from datetime import datetime, date
 from mock import patch, Mock
 from unittest import TestCase
 from swift.common.swob import Request
-from swift_cloud.drivers.gcp import SwiftGCPDriver
-
 from google.cloud.exceptions import NotFound
-
-from datetime import date
+from swift_cloud.drivers.gcp import SwiftGCPDriver
 
 
 class FakeApp:
@@ -63,6 +60,7 @@ class FakeBlob:
 
     def delete(self):
         pass
+
 
 class FakeBucket:
     def __init__(self, blob=FakeBlob(), blobs=[], exists=True):

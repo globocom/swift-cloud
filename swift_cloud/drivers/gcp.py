@@ -64,6 +64,9 @@ class SwiftGCPDriver(BaseDriver):
         }
 
     def response(self):
+        if not self.client:
+            return self.app
+
         version, account, container, obj = split_path(
             wsgi_to_str(self.req.path), 1, 4, True)
 
@@ -81,9 +84,13 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response(b'Invalid request path', 500)
 
     def _get_client(self):
-        credentials_path = self.conf.get('gcp_credentials')
-        credentials = Credentials.from_service_account_file(credentials_path)
-        return storage.Client(credentials=credentials)
+        try:
+            credentials_path = self.conf.get('gcp_credentials')
+            credentials = Credentials.from_service_account_file(credentials_path)
+            return storage.Client(credentials=credentials)
+        except Exception as err:
+            log.error(err)
+            return None
 
     def _default_response(self, body, status, headers={}):
         self.headers.update(headers)
