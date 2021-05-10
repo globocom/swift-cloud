@@ -123,7 +123,7 @@ class SwiftGCPDriver(BaseDriver):
             """All POST requests for Account will be forwarded"""
             return self.app
 
-    def _get_or_create_bucket(bucket_name):
+    def _get_or_create_bucket(self, bucket_name):
         try:
             return self.client.get_bucket(bucket_name)
         except NotFound:
