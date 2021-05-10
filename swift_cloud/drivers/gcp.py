@@ -144,7 +144,7 @@ class SwiftGCPDriver(BaseDriver):
         account_blobs, containers, objects = [], [], []
 
         try:
-            account_blobs = list(bucket.list_blobs())
+            account_blobs = list(account_bucket.list_blobs())
             containers = filter(is_container, account_blobs)
             objects = filter(is_object, account_blobs)
         except Exception as err:
