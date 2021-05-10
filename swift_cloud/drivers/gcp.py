@@ -123,11 +123,28 @@ class SwiftGCPDriver(BaseDriver):
             """All POST requests for Account will be forwarded"""
             return self.app
 
-    def head_account(self):
-        account_blobs, containers, objects = [], [], []
+    def _get_or_create_bucket(bucket_name):
         try:
-            account_bucket = self.client.get_bucket(self.account)
-            account_blobs = list(account_bucket.list_blobs())
+            return self.client.get_bucket(bucket_name)
+        except NotFound:
+            bucket = self.client.create_bucket(bucket_name, location=BUCKET_LOCATION)
+            bucket.iam_configuration.uniform_bucket_level_access_enabled = False
+            bucket.patch()
+            return bucket
+        except Exception as err:
+            log.error(err)
+            return None
+
+    def head_account(self):
+        account_bucket = self._get_or_create_bucket(self.account)
+
+        if not account_bucket:
+            return self._error_response('Accout bucket not found.')
+
+        account_blobs, containers, objects = [], [], []
+
+        try:
+            account_blobs = list(bucket.list_blobs())
             containers = filter(is_container, account_blobs)
             objects = filter(is_object, account_blobs)
         except Exception as err:
@@ -148,9 +165,14 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204, headers)
 
     def get_account(self):
+        account_bucket = self._get_or_create_bucket(self.account)
+
+        if not account_bucket:
+            return self._error_response('Accout bucket not found.')
+
         account_blobs, containers, objects = [], [], []
+
         try:
-            account_bucket = self.client.get_bucket(self.account)
             account_blobs = list(account_bucket.list_blobs())
             containers = filter(is_container, account_blobs)
             objects = filter(is_object, account_blobs)
