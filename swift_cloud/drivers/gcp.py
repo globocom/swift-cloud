@@ -227,6 +227,7 @@ class SwiftGCPDriver(BaseDriver):
     def head_container(self):
         try:
             account_bucket = self.client.get_bucket(self.account)
+            blob = account_bucket.get_blob(self.container + '/')
             prefix = self.container + '/'
             container_blobs = list(account_bucket.list_blobs(prefix=prefix))
             objects = filter(is_object, container_blobs)
@@ -238,6 +239,10 @@ class SwiftGCPDriver(BaseDriver):
             'X-Container-Object-Count': len(objects),
             'X-Container-Bytes-Used': blobs_size(objects)
         }
+
+        if blob.metadata:
+            for key, value in blob.metadata.items():
+                headers['X-Container-{}'.format(key)] = value
 
         return self._default_response('', 204, headers)
 
@@ -309,26 +314,23 @@ class SwiftGCPDriver(BaseDriver):
             prefix = key.split('X-Container-Meta-')
 
             if len(prefix) > 1:
-                meta = prefix[1].lower()
+                meta = 'meta-'.format(prefix[1].lower())
                 metadata[meta] = item[1].lower()
                 continue
 
             prefix = key.split('X-Remove-Container-Meta-')
 
             if len(prefix) > 1:
-                meta = prefix[1].lower()
+                meta = 'meta-'.format(prefix[1].lower())
                 if metadata.get(meta):
                     metadata[meta] = None
                 continue
 
-            if key == 'X-Container-Read':
-                if value == '.r:*':
-                    # bucket.make_public(recursive=True, future=True, client=self.client)
-                    metadata["read"] = value
-                    continue
+            if key == 'X-Container-Read' and value == '.r:*':
+                metadata["read"] = value
+                continue
 
-            if key == 'X-Remove-Container-Read':
-                # bucket.make_private(recursive=True, future=True, client=self.client)
+            if (key == 'X-Container-Read' and value == '') or key == 'X-Remove-Container-Read':
                 if metadata.get('read'):
                     metadata["read"] = None
                 continue
