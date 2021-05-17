@@ -112,7 +112,16 @@ class SwiftGCPDriver(BaseDriver):
                         headers=HeaderKeyDict(**self.headers),
                         request=self.req)
 
+    def _is_authorized(self):
+        if 'swift.authorize' in self.req.environ:
+            return self.req.environ['swift.authorize'](self.req)
+        return self.app
+
     def handle_account(self):
+        aresp = self._is_authorized()
+        if aresp:
+            return aresp
+
         if self.req.method == 'HEAD':
             return self.head_account()
 
@@ -209,6 +218,10 @@ class SwiftGCPDriver(BaseDriver):
         return self._json_response(container_list, status, headers)
 
     def handle_container(self):
+        aresp = self._is_authorized()
+        if aresp:
+            return aresp
+
         if self.req.method == 'HEAD':
             return self.head_container()
 
@@ -375,6 +388,10 @@ class SwiftGCPDriver(BaseDriver):
         if self.req.method == 'GET':
             return self.get_object()
 
+        aresp = self._is_authorized()
+        if aresp:
+            return aresp
+
         if self.req.method == 'PUT':
             return self.put_object()
 
@@ -456,6 +473,19 @@ class SwiftGCPDriver(BaseDriver):
 
     def get_object(self):
         bucket = self.client.get_bucket(self.account)
+        container = bucket.get_blob(self.container + '/')
+
+        if not container:
+            return self._default_response('', 404)
+
+        metadata = container.metadata or {}
+        read = metadata.get('read')
+
+        if not read or read != '.r:*':
+            aresp = self._is_authorized()
+            if aresp:
+                return self._default_response('', 401)
+
         obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 

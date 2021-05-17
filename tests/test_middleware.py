@@ -64,13 +64,6 @@ class MiddlewareTestCase(TestCase):
         res = Request(self.environ).get_response(self.app)
         self.assertEquals(res.body, "Fake App")
 
-    def test_unauthorized_request(self):
-        self.environ['swift.authorize'] = lambda req: Response(status=403)
-        self.mock_get_account_info.return_value = {
-            'meta': {'cloud': 'cloudone'}}
-        res = Request(self.environ).get_response(self.app)
-        self.assertEquals(res.status_int, 403)
-
     @patch('swift_cloud.middleware.SwiftGCPDriver')
     def test_if_authorized_return_handler_with_default_gcp_driver(self, mock_driver):
         mock_driver.return_value = FakeGCPDriver()

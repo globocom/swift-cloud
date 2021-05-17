@@ -32,19 +32,11 @@ class SwiftCloudMiddleware(object):
         except ValueError as err:
             return self.app(environ, start_response)
 
-        if 'swift.authorize' not in environ:
-            log.info('No authentication, skipping swift_cloud')
-            return self.app(environ, start_response)
-
         account_info = get_account_info(environ, self.app)
         cloud_name = account_info['meta'].get('cloud')
 
         if cloud_name and cloud_name in self.providers:
             req = Request(environ)
-            aresp = environ['swift.authorize'](req)
-
-            if aresp:
-                return aresp(environ, start_response)
 
             handler = self.app
             if cloud_name == 'gcp':
