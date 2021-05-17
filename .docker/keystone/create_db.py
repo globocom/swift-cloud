@@ -35,6 +35,12 @@ def run():
             c.execute('CREATE DATABASE keystone DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;')
             print('Database keystone created!')
 
+        try:
+            c.execute("CREATE USER 'root'@'10.5.0.6';")
+            c.execute("GRANT ALL PRIVILEGES ON *.* TO 'root'@'10.5.0.6' WITH GRANT OPTION;")
+        except Exception:
+            pass
+
         exit(0)
 
     exit(1)
