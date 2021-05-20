@@ -20,18 +20,18 @@ BUCKET_LOCATION = 'SOUTHAMERICA-EAST1'
 
 
 def is_container(blob):
-    n = blob.name.split('/')
-    return len(n) == 2 and n[-1] == ''
+    chunks = blob.name.split('/')
+    return len(chunks) == 2 and chunks[-1] == ''
 
 
-def is_object(blob):
-    n = blob.name.split('/')
-    return len(n) >= 2 and n[-1] != ''
+def is_object(level, blob):
+    chunks = blob.name.split('/')
+    return len(chunks) >= 2 and chunks[-1] != '' and len(chunks) - 1 == level
 
 
-def is_pseudofolder(blob):
-    n = blob.name.split('/')
-    return len(n) > 2 and n[-1] == ''
+def is_pseudofolder(level, blob):
+    chunks = blob.name.split('/')
+    return len(chunks) > 2 and chunks[-1] == '' and len(chunks) - 2 == level
 
 
 def blobs_size(blob_list):
@@ -70,6 +70,9 @@ class SwiftGCPDriver(BaseDriver):
         version, account, container, obj = split_path(
             wsgi_to_str(self.req.path), 1, 4, True)
 
+        prefix = self.req.params.get('prefix')
+
+        self.prefix = prefix[:-1] if prefix else ''
         self.account = account.lower() if account else None
         self.container = container
         self.obj = obj
@@ -155,7 +158,8 @@ class SwiftGCPDriver(BaseDriver):
         try:
             account_blobs = list(account_bucket.list_blobs())
             containers = filter(is_container, account_blobs)
-            objects = filter(is_object, account_blobs)
+            level = 1
+            objects = filter(lambda x: is_object(level, x), account_blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -184,7 +188,8 @@ class SwiftGCPDriver(BaseDriver):
         try:
             account_blobs = list(account_bucket.list_blobs())
             containers = filter(is_container, account_blobs)
-            objects = filter(is_object, account_blobs)
+            level = 1
+            objects = filter(lambda x: is_object(level, x), account_blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -240,10 +245,11 @@ class SwiftGCPDriver(BaseDriver):
     def head_container(self):
         try:
             account_bucket = self.client.get_bucket(self.account)
-            blob = account_bucket.get_blob(self.container + '/')
-            prefix = self.container + '/'
+            prefix = '/'.join([self.container, self.prefix])
+            blob = account_bucket.get_blob(prefix)
             container_blobs = list(account_bucket.list_blobs(prefix=prefix))
-            objects = filter(is_object, container_blobs)
+            level = len(prefix[:-1].split('/'))
+            objects = filter(lambda x: is_object(level, x), container_blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -262,10 +268,11 @@ class SwiftGCPDriver(BaseDriver):
     def get_container(self):
         try:
             account_bucket = self.client.get_bucket(self.account)
-            prefix = self.container + '/'
+            prefix = '/'.join([self.container, self.prefix])
             blobs = list(account_bucket.list_blobs(prefix=prefix))
-            objects = filter(is_object, blobs)
-            pseudofolders = filter(is_pseudofolder, blobs)
+            level = len(prefix[:-1].split('/'))
+            pseudofolders = filter(lambda x: is_pseudofolder(level, x), blobs)
+            objects = filter(lambda x: is_object(level, x), blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -416,6 +423,9 @@ class SwiftGCPDriver(BaseDriver):
 
         if blob.content_disposition:
             headers['Content-Disposition'] = blob.content_disposition
+
+        if blob.size:
+            headers['Content-Length'] = blob.size
 
         if blob.metadata:
             for key, value in blob.metadata.items():
