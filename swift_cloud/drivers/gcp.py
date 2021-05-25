@@ -334,14 +334,14 @@ class SwiftGCPDriver(BaseDriver):
             prefix = key.split('X-Container-Meta-')
 
             if len(prefix) > 1:
-                meta = 'meta-'.format(prefix[1].lower())
+                meta = 'meta-{}'.format(prefix[1].lower())
                 metadata[meta] = item[1].lower()
                 continue
 
             prefix = key.split('X-Remove-Container-Meta-')
 
             if len(prefix) > 1:
-                meta = 'meta-'.format(prefix[1].lower())
+                meta = 'meta-{}'.format(prefix[1].lower())
                 if metadata.get(meta):
                     metadata[meta] = None
                 continue
@@ -395,6 +395,9 @@ class SwiftGCPDriver(BaseDriver):
         if self.req.method == 'GET':
             return self.get_object()
 
+        if self.req.method == 'OPTIONS':
+            return self.options_object()
+
         aresp = self._is_authorized()
         if aresp:
             return aresp
@@ -429,7 +432,7 @@ class SwiftGCPDriver(BaseDriver):
 
         if blob.metadata:
             for key, value in blob.metadata.items():
-                headers['X-Object-Meta-{}'.format(key)] = value
+                headers['x-object-meta-{}'.format(key)] = value
 
         return headers
 
@@ -506,6 +509,31 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response(
             blob.download_as_bytes(), 200, headers)
+
+    def options_object(self):
+        try:
+            bucket = self.client.get_bucket(self.account)
+        except Exception as err:
+            log.error(err)
+            return self._error_response(err)
+
+        blob = bucket.get_blob(self.container + '/')
+
+        if not blob:
+            return self._default_response('', 404)
+
+        metadata = blob.metadata or {}
+        cors = metadata.get('meta-access-control-allow-origin')
+
+        if not cors:
+            return self._default_response('', 200)
+
+        origin = self.req.headers.get('origin')
+
+        if origin not in cors.split(' '):
+            return self._default_response('', 401)
+
+        return self._default_response('', 200)
 
     def put_object(self):
         bucket = self.client.get_bucket(self.account)

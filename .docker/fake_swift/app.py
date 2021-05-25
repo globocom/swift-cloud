@@ -55,7 +55,7 @@ def create_app():
 
         return resp
 
-    @app.route('/v1/<account>/<container>/<obj>')
+    @app.route('/v1/<account>/<container>/<obj>', methods=['OPTIONS', 'GET'])
     def get_object(account, container, obj):
         resp = make_response('')
 
