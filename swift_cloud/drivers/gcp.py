@@ -389,6 +389,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204)
 
     def handle_object(self):
+        log.error('>>> handle_object - method <<< {}'.format(self.req.method))
         if self.req.method == 'HEAD':
             return self.head_object()
 
@@ -485,6 +486,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204, headers)
 
     def get_object(self):
+        log.error('>>> get_object <<<')
         bucket = self.client.get_bucket(self.account)
         container = bucket.get_blob(self.container + '/')
 
@@ -511,6 +513,7 @@ class SwiftGCPDriver(BaseDriver):
             blob.download_as_bytes(), 200, headers)
 
     def options_object(self):
+        log.error('>>> options_object <<<')
         try:
             bucket = self.client.get_bucket(self.account)
         except Exception as err:
@@ -524,12 +527,12 @@ class SwiftGCPDriver(BaseDriver):
 
         metadata = blob.metadata or {}
         cors = metadata.get('meta-access-control-allow-origin')
-
+        log.error('>>> options_object - cors <<< {}'.format(cors))
         if not cors:
             return self._default_response('', 200)
 
         origin = self.req.headers.get('origin')
-
+        log.error('>>> options_object - origin <<< {}'.format(origin))
         if origin not in cors.split(' '):
             return self._default_response('', 401)
 
