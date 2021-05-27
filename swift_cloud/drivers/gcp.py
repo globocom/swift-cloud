@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import functools
 from uuid import uuid4
 
 from swift.common.swob import Response, wsgi_to_str
@@ -85,6 +86,89 @@ class SwiftGCPDriver(BaseDriver):
             return self.handle_account()
 
         return self._default_response(b'Invalid request path', 500)
+
+    def cors_validation(func):
+        """
+        Decorator to check if the request is a CORS request and if so, if it's
+        valid.
+
+        :param func: function to check
+        """
+        @functools.wraps(func)
+        def wrapped(*a, **kw):
+            controller = a[0]
+            req = a[1]
+
+            # The logic here was interpreted from
+            #    http://www.w3.org/TR/cors/#resource-requests
+
+            # Is this a CORS request?
+            req_origin = req.headers.get('Origin', None)
+            if req_origin:
+                # Yes, this is a CORS request so test if the origin is allowed
+                try:
+                    bucket = controller.client.get_bucket(controller.account)
+                except Exception as err:
+                    return controller._error_response(err)
+
+                blob = bucket.get_blob(controller.container + '/')
+
+                if not blob:
+                    return controller._default_response('', 404)
+
+                metadata = blob.metadata or {}
+                cors_info = metadata.get('meta-access-control-allow-origin').split(' ')
+
+                # Call through to the decorated method
+                new = a + (bucket, blob,)
+                resp = func(*new, **kw)
+
+                if '*' not in cors_info:
+                    if req_origin not in cors_info:
+                        return resp
+
+                # Expose,
+                #  - simple response headers,
+                #    http://www.w3.org/TR/cors/#simple-response-header
+                #  - swift specific: etag, x-timestamp, x-trans-id
+                #  - headers provided by the operator in cors_expose_headers
+                #  - user metadata headers
+                #  - headers provided by the user in
+                #    x-container-meta-access-control-expose-headers
+                if 'Access-Control-Expose-Headers' not in resp.headers:
+                    expose_headers = set([
+                        'cache-control', 'content-language', 'content-type',
+                        'expires', 'last-modified', 'pragma', 'etag',
+                        'x-timestamp', 'x-trans-id', 'x-openstack-request-id'])
+
+                    for header in resp.headers:
+                        if header.startswith('X-Container-Meta') or \
+                                header.startswith('X-Object-Meta'):
+                            expose_headers.add(header.lower())
+
+                    if req.headers.get('expose_headers'):
+                        expose_headers = expose_headers.union(
+                            [header_line.strip().lower()
+                             for header_line in
+                             cors_info['expose_headers'].split(' ')
+                             if header_line.strip()])
+                    resp.headers['Access-Control-Expose-Headers'] = \
+                        ', '.join(expose_headers)
+
+                # The user agent won't process the response if the Allow-Origin
+                # header isn't included
+                if 'Access-Control-Allow-Origin' not in resp.headers:
+                    if '*' in cors_info:
+                        resp.headers['Access-Control-Allow-Origin'] = '*'
+                    else:
+                        resp.headers['Access-Control-Allow-Origin'] = req_origin
+
+                return resp
+            else:
+                # Not a CORS request so make the call as normal
+                return func(*a, **kw)
+
+        return wrapped
 
     def _get_client(self):
         try:
@@ -228,26 +312,28 @@ class SwiftGCPDriver(BaseDriver):
             return aresp
 
         if self.req.method == 'HEAD':
-            return self.head_container()
+            return self.head_container(self.req)
 
         if self.req.method == 'GET':
-            return self.get_container()
+            return self.get_container(self.req)
 
         if self.req.method == 'PUT':
-            return self.put_container()
+            return self.put_container(self.req)
 
         if self.req.method == 'POST':
-            return self.post_container()
+            return self.post_container(self.req)
 
         if self.req.method == 'DELETE':
-            return self.delete_container()
+            return self.delete_container(self.req)
 
-    def head_container(self):
+    @cors_validation
+    def head_container(self, req, bucket=None):
         try:
-            account_bucket = self.client.get_bucket(self.account)
+            if not bucket:
+                bucket = self.client.get_bucket(self.account)
             prefix = '/'.join([self.container, self.prefix])
-            blob = account_bucket.get_blob(prefix)
-            container_blobs = list(account_bucket.list_blobs(prefix=prefix))
+            blob = bucket.get_blob(prefix)
+            container_blobs = list(bucket.list_blobs(prefix=prefix))
             level = len(prefix[:-1].split('/'))
             objects = filter(lambda x: is_object(level, x), container_blobs)
         except Exception as err:
@@ -265,11 +351,13 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response('', 204, headers)
 
-    def get_container(self):
+    @cors_validation
+    def get_container(self, req, bucket=None):
         try:
-            account_bucket = self.client.get_bucket(self.account)
+            if not bucket:
+                bucket = self.client.get_bucket(self.account)
             prefix = '/'.join([self.container, self.prefix])
-            blobs = list(account_bucket.list_blobs(prefix=prefix))
+            blobs = list(bucket.list_blobs(prefix=prefix))
             level = len(prefix[:-1].split('/'))
             pseudofolders = filter(lambda x: is_pseudofolder(level, x), blobs)
             objects = filter(lambda x: is_object(level, x), blobs)
@@ -299,9 +387,11 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._json_response(object_list, status, headers)
 
-    def put_container(self):
+    @cors_validation
+    def put_container(self, req, bucket=None):
         try:
-            bucket = self.client.get_bucket(self.account)
+            if not bucket:
+                bucket = self.client.get_bucket(self.account)
         except NotFound:
             bucket = self.client.create_bucket(self.account, location=BUCKET_LOCATION)
             bucket.iam_configuration.uniform_bucket_level_access_enabled = False
@@ -315,9 +405,11 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response('', 201)
 
-    def post_container(self):
+    @cors_validation
+    def post_container(self, req, bucket=None):
         try:
-            bucket = self.client.get_bucket(self.account)
+            if not bucket:
+                bucket = self.client.get_bucket(self.account)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -370,9 +462,11 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response('', 204)
 
-    def delete_container(self):
+    @cors_validation
+    def delete_container(self, req, bucket=None):
         try:
-            bucket = self.client.get_bucket(self.account)
+            if not bucket:
+                bucket = self.client.get_bucket(self.account)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -389,28 +483,24 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204)
 
     def handle_object(self):
-        log.error('>>> handle_object - method <<< {}'.format(self.req.method))
         if self.req.method == 'HEAD':
-            return self.head_object()
+            return self.head_object(self.req)
 
         if self.req.method == 'GET':
-            return self.get_object()
-
-        if self.req.method == 'OPTIONS':
-            return self.options_object()
+            return self.get_object(self.req)
 
         aresp = self._is_authorized()
         if aresp:
             return aresp
 
         if self.req.method == 'PUT':
-            return self.put_object()
+            return self.put_object(self.req)
 
         if self.req.method == 'POST':
-            return self.post_object()
+            return self.post_object(self.req)
 
         if self.req.method == 'DELETE':
-            return self.delete_object()
+            return self.delete_object(self.req)
 
     def get_object_headers(self, blob):
         headers = {
@@ -473,9 +563,11 @@ class SwiftGCPDriver(BaseDriver):
 
         return updated, blob
 
-    def head_object(self):
-        bucket = self.client.get_bucket(self.account)
-        obj_path = "%s/%s" % (self.container, self.obj)
+    @cors_validation
+    def head_object(self, req, bucket=None):
+        if not bucket:
+            bucket = self.client.get_bucket(self.account)
+        obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
@@ -485,15 +577,17 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response('', 204, headers)
 
-    def get_object(self):
-        log.error('>>> get_object <<<')
-        bucket = self.client.get_bucket(self.account)
-        container = bucket.get_blob(self.container + '/')
+    @cors_validation
+    def get_object(self, req, bucket=None, blob=None):
+        if not bucket:
+            bucket = self.client.get_bucket(self.account)
+        if not blob:
+            blob = bucket.get_blob(self.container + '/')
 
-        if not container:
+        if not blob:
             return self._default_response('', 404)
 
-        metadata = container.metadata or {}
+        metadata = blob.metadata or {}
         read = metadata.get('read')
 
         if not read or read != '.r:*':
@@ -512,35 +606,11 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response(
             blob.download_as_bytes(), 200, headers)
 
-    def options_object(self):
-        log.error('>>> options_object <<<')
-        try:
+    @cors_validation
+    def put_object(self, req, bucket=None):
+        if not bucket:
             bucket = self.client.get_bucket(self.account)
-        except Exception as err:
-            log.error(err)
-            return self._error_response(err)
-
-        blob = bucket.get_blob(self.container + '/')
-
-        if not blob:
-            return self._default_response('', 404)
-
-        metadata = blob.metadata or {}
-        cors = metadata.get('meta-access-control-allow-origin')
-        log.error('>>> options_object - cors <<< {}'.format(cors))
-        if not cors:
-            return self._default_response('', 200)
-
-        origin = self.req.headers.get('origin')
-        log.error('>>> options_object - origin <<< {}'.format(origin))
-        if origin not in cors.split(' '):
-            return self._default_response('', 401)
-
-        return self._default_response('', 200)
-
-    def put_object(self):
-        bucket = self.client.get_bucket(self.account)
-        obj_path = "%s/%s" % (self.container, self.obj)
+        obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.blob(obj_path)
         content_type = self.req.headers.get('Content-Type')
 
@@ -568,9 +638,11 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response('', 201, headers)
 
-    def post_object(self):
-        bucket = self.client.get_bucket(self.account)
-        obj_path = "%s/%s" % (self.container, self.obj)
+    @cors_validation
+    def post_object(self, req, bucket=None):
+        if not bucket:
+            bucket = self.client.get_bucket(self.account)
+        obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
@@ -583,9 +655,11 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._default_response('', 202)  # Accepted
 
-    def delete_object(self):
-        bucket = self.client.get_bucket(self.account)
-        obj_path = "%s/%s" % (self.container, self.obj)
+    @cors_validation
+    def delete_object(self, req, bucket=None):
+        if not bucket:
+            bucket = self.client.get_bucket(self.account)
+        obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
         if not blob.exists():
