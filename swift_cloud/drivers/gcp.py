@@ -10,7 +10,7 @@ from swift.common.header_key_dict import HeaderKeyDict
 from swift.common.exceptions import ChunkReadError
 
 from google.cloud import storage
-from google.cloud.exceptions import NotFound
+from google.cloud.exceptions import NotFound, Conflict
 from google.oauth2.service_account import Credentials
 
 from swift_cloud.drivers.base import BaseDriver
@@ -215,9 +215,12 @@ class SwiftGCPDriver(BaseDriver):
         if self.req.method == 'GET':
             return self.get_account()
 
-        if self.req.method == 'POST':
-            """All POST requests for Account will be forwarded"""
+        if self.req.method in ['POST']:
+            """POST requests for Account will be forwarded"""
             return self.app
+
+        if self.req.method == 'DELETE':
+            return self.delete_account()
 
     def _get_or_create_bucket(self, bucket_name):
         try:
@@ -235,7 +238,7 @@ class SwiftGCPDriver(BaseDriver):
         account_bucket = self._get_or_create_bucket(self.account)
 
         if not account_bucket:
-            return self._error_response('Accout bucket not found.')
+            return self._error_response('Get Account Error.')
 
         account_blobs, containers, objects = [], [], []
 
@@ -265,7 +268,7 @@ class SwiftGCPDriver(BaseDriver):
         account_bucket = self._get_or_create_bucket(self.account)
 
         if not account_bucket:
-            return self._error_response('Accout bucket not found.')
+            return self._error_response('Get Account Error.')
 
         account_blobs, containers, objects = [], [], []
 
@@ -305,6 +308,17 @@ class SwiftGCPDriver(BaseDriver):
             status = 204
 
         return self._json_response(container_list, status, headers)
+
+    def delete_account(self):
+        try:
+            account_bucket = self.client.get_bucket(bucket_name)
+            account_bucket.delete()
+        except NotFound:
+            return self._error_response('Account not found.')
+        except Conflict:
+            return self._error_response('Account must be empty.')
+
+        return self._default_response('', 204, headers)
 
     def handle_container(self):
         aresp = self._is_authorized()
