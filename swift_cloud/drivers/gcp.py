@@ -18,6 +18,7 @@ from swift_cloud.drivers.base import BaseDriver
 log = logging.getLogger(__name__)
 
 BUCKET_LOCATION = 'SOUTHAMERICA-EAST1'
+RESERVED_META = ['delete-at', 'delete-after']
 
 
 def is_container(blob):
@@ -537,7 +538,10 @@ class SwiftGCPDriver(BaseDriver):
 
         if blob.metadata:
             for key, value in blob.metadata.items():
-                headers['x-object-meta-{}'.format(key)] = value
+                if key not in RESERVED_META:
+                    headers['x-object-meta-{}'.format(key)] = value
+                else:
+                    headers['x-{}'.format(key)] = value
 
         return headers
 
@@ -595,6 +599,7 @@ class SwiftGCPDriver(BaseDriver):
     def get_object(self, req, bucket=None, blob=None):
         if not bucket:
             bucket = self.client.get_bucket(self.account)
+
         if not blob:
             blob = bucket.get_blob(self.container + '/')
 
