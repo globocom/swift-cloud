@@ -583,7 +583,7 @@ class SwiftGCPDriver(BaseDriver):
             key = item.lower()
             metadata[key] = self.req.headers.get(item)
 
-        if len(meta_keys):
+        if len(meta_keys) or len(reserved_keys):
             blob.metadata = metadata
             updated = True
 
@@ -598,6 +598,14 @@ class SwiftGCPDriver(BaseDriver):
 
         if not blob.exists():
             return self._default_response('', 404)
+
+        metadata = blob.metadata or {}
+        read = metadata.get('read')
+
+        if not read or read != '.r:*':
+            aresp = self._is_authorized()
+            if aresp:
+                return self._default_response('', 401)
 
         headers = self.get_object_headers(blob)
 
