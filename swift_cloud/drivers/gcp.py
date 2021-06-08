@@ -18,7 +18,7 @@ from swift_cloud.drivers.base import BaseDriver
 log = logging.getLogger(__name__)
 
 BUCKET_LOCATION = 'SOUTHAMERICA-EAST1'
-RESERVED_META = ['delete-at', 'delete-after']
+RESERVED_META = ['x-delete-at', 'x-delete-after']
 
 
 def is_container(blob):
@@ -541,7 +541,7 @@ class SwiftGCPDriver(BaseDriver):
                 if key not in RESERVED_META:
                     headers['x-object-meta-{}'.format(key)] = value
                 else:
-                    headers['x-{}'.format(key)] = value
+                    headers[key] = value
 
         return headers
 
@@ -563,9 +563,13 @@ class SwiftGCPDriver(BaseDriver):
             blob.content_disposition = content_disposition
             updated = True
 
+
         metadata = {}
         meta_keys = filter(lambda x: 'x-object-meta' in x.lower(),
                            self.req.headers.keys())
+
+        reserved_keys = filter(lambda x: x.lower() in RESERVED_META,
+                               self.req.headers.keys())
 
         if blob.metadata:
             for key in blob.metadata.keys():
@@ -573,6 +577,10 @@ class SwiftGCPDriver(BaseDriver):
 
         for item in meta_keys:
             key = item.lower().split('x-object-meta-')[-1]
+            metadata[key] = self.req.headers.get(item)
+
+        for item in reserved_keys:
+            key = item.lower()
             metadata[key] = self.req.headers.get(item)
 
         if len(meta_keys):
