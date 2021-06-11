@@ -31,8 +31,8 @@ def cors_validation(func):
                 return controller._default_response('', 404)
 
             metadata = blob.metadata or {}
-            cors_info = metadata.get('meta-access-control-allow-origin') or ''
-            cors_info = cors_info.split(' ')
+            allow_origin = metadata.get('meta-access-control-allow-origin') or ''
+            cors_info = allow_origin.split(' ')
 
             # Call through to the decorated method
             new = a + (bucket, blob,)

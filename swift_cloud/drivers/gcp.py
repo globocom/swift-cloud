@@ -262,7 +262,7 @@ class SwiftGCPDriver(BaseDriver):
             return self.delete_container(self.req)
 
     @cors_validation
-    def head_container(self, req, bucket=None):
+    def head_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
                 bucket = self.client.get_bucket(self.account)
@@ -287,7 +287,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204, headers)
 
     @cors_validation
-    def get_container(self, req, bucket=None):
+    def get_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
                 bucket = self.client.get_bucket(self.account)
@@ -323,7 +323,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._json_response(object_list, status, headers)
 
     @cors_validation
-    def put_container(self, req, bucket=None):
+    def put_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
                 bucket = self.client.get_bucket(self.account)
@@ -341,7 +341,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 201)
 
     @cors_validation
-    def post_container(self, req, bucket=None):
+    def post_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
                 bucket = self.client.get_bucket(self.account)
@@ -398,7 +398,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204)
 
     @cors_validation
-    def delete_container(self, req, bucket=None):
+    def delete_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
                 bucket = self.client.get_bucket(self.account)
@@ -509,7 +509,7 @@ class SwiftGCPDriver(BaseDriver):
         return updated, blob
 
     @cors_validation
-    def head_object(self, req, bucket=None):
+    def head_object(self, req, bucket=None, obj=None):
         if not bucket:
             bucket = self.client.get_bucket(self.account)
         obj_path = "{}/{}".format(self.container, self.obj)
@@ -561,7 +561,7 @@ class SwiftGCPDriver(BaseDriver):
             blob.download_as_bytes(), 200, headers)
 
     @cors_validation
-    def put_object(self, req, bucket=None):
+    def put_object(self, req, bucket=None, obj=None):
         if not bucket:
             bucket = self.client.get_bucket(self.account)
         obj_path = "{}/{}".format(self.container, self.obj)
@@ -608,7 +608,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 201, headers)
 
     @cors_validation
-    def post_object(self, req, bucket=None):
+    def post_object(self, req, bucket=None, obj=None):
         if not bucket:
             bucket = self.client.get_bucket(self.account)
         obj_path = "{}/{}".format(self.container, self.obj)
@@ -644,7 +644,7 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 202)  # Accepted
 
     @cors_validation
-    def delete_object(self, req, bucket=None):
+    def delete_object(self, req, bucket=None, obj=None):
         if not bucket:
             bucket = self.client.get_bucket(self.account)
         obj_path = "{}/{}".format(self.container, self.obj)
