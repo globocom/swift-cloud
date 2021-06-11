@@ -8,12 +8,14 @@ from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
 from swift.common.header_key_dict import HeaderKeyDict
 from swift.common.exceptions import ChunkReadError
+from swift.proxy.controllers.base import cors_validation
 
 from google.cloud import storage
 from google.cloud.exceptions import NotFound, Conflict
 from google.oauth2.service_account import Credentials
 
 from swift_cloud.drivers.base import BaseDriver
+from swift_cloud.tools import SwiftCloudTools
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +60,8 @@ class SwiftGCPDriver(BaseDriver):
         self.container = None
         self.obj = None
 
+        self.tools = SwiftCloudTools(conf)
+
         self.headers = {
             'Content-Type': 'text/html; charset=utf-8',
             'X-Timestamp': Timestamp.now().normal,
@@ -87,89 +91,6 @@ class SwiftGCPDriver(BaseDriver):
             return self.handle_account()
 
         return self._default_response(b'Invalid request path', 500)
-
-    def cors_validation(func):
-        """
-        Decorator to check if the request is a CORS request and if so, if it's
-        valid.
-
-        :param func: function to check
-        """
-        @functools.wraps(func)
-        def wrapped(*a, **kw):
-            controller = a[0]
-            req = a[1]
-
-            # The logic here was interpreted from
-            #    http://www.w3.org/TR/cors/#resource-requests
-
-            # Is this a CORS request?
-            req_origin = req.headers.get('Origin', None)
-            if req_origin:
-                # Yes, this is a CORS request so test if the origin is allowed
-                try:
-                    bucket = controller.client.get_bucket(controller.account)
-                except Exception as err:
-                    return controller._error_response(err)
-
-                blob = bucket.get_blob(controller.container + '/')
-
-                if not blob:
-                    return controller._default_response('', 404)
-
-                metadata = blob.metadata or {}
-                cors_info = metadata.get('meta-access-control-allow-origin').split(' ')
-
-                # Call through to the decorated method
-                new = a + (bucket, blob,)
-                resp = func(*new, **kw)
-
-                if '*' not in cors_info:
-                    if req_origin not in cors_info:
-                        return resp
-
-                # Expose,
-                #  - simple response headers,
-                #    http://www.w3.org/TR/cors/#simple-response-header
-                #  - swift specific: etag, x-timestamp, x-trans-id
-                #  - headers provided by the operator in cors_expose_headers
-                #  - user metadata headers
-                #  - headers provided by the user in
-                #    x-container-meta-access-control-expose-headers
-                if 'Access-Control-Expose-Headers' not in resp.headers:
-                    expose_headers = set([
-                        'cache-control', 'content-language', 'content-type',
-                        'expires', 'last-modified', 'pragma', 'etag',
-                        'x-timestamp', 'x-trans-id', 'x-openstack-request-id'])
-
-                    for header in resp.headers:
-                        if header.startswith('X-Container-Meta') or \
-                                header.startswith('X-Object-Meta'):
-                            expose_headers.add(header.lower())
-
-                    if req.headers.get('expose_headers'):
-                        expose_headers = expose_headers.union(
-                            [header_line.strip().lower()
-                             for header_line in
-                             cors_info['expose_headers'].split(' ')
-                             if header_line.strip()])
-                    resp.headers['Access-Control-Expose-Headers'] = \
-                        ', '.join(expose_headers)
-
-                # The user agent won't process the response if the Allow-Origin
-                # header isn't included
-                if 'Access-Control-Allow-Origin' not in resp.headers:
-                    if '*' in cors_info:
-                        resp.headers['Access-Control-Allow-Origin'] = '*'
-                    else:
-                        resp.headers['Access-Control-Allow-Origin'] = req_origin
-
-                return resp
-            else:
-                # Not a CORS request so make the call as normal
-                return func(*a, **kw)
-
-        return wrapped
 
     def _get_client(self):
         try:
@@ -563,7 +484,6 @@ class SwiftGCPDriver(BaseDriver):
             blob.content_disposition = content_disposition
             updated = True
 
-
         metadata = {}
         meta_keys = filter(lambda x: 'x-object-meta' in x.lower(),
                            self.req.headers.keys())
@@ -649,6 +569,17 @@ class SwiftGCPDriver(BaseDriver):
         blob = bucket.blob(obj_path)
         content_type = self.req.headers.get('Content-Type')
 
+        _, blob = self.update_object_headers(blob)
+
+        delete_at = blob.metadata.get('x-delete-at')
+
+        if delete_at:
+            result, msg = self.tools.add_delete_at(
+                self.account, self.container, self.obj, delete_at)
+
+            if not result:
+                return self._error_response(msg)
+
         def reader():
             try:
                 return self.req.environ['wsgi.input'].read()
@@ -664,8 +595,6 @@ class SwiftGCPDriver(BaseDriver):
             except StopIteration:
                 break
             obj_data += chunk
-
-        _, blob = self.update_object_headers(blob)
 
         blob.upload_from_string(obj_data, content_type=content_type)
 
@@ -684,6 +613,19 @@ class SwiftGCPDriver(BaseDriver):
             return self._default_response('', 404)
 
         updated, blob = self.update_object_headers(blob)
+
+        delete_at = blob.metadata.get('x-delete-at')
+
+        if delete_at:
+            if delete_at != '':
+                result, msg = self.tools.add_delete_at(
+                    self.account, self.container, self.obj, delete_at)
+            else:
+                result, msg = self.tools.remove_delete_at(
+                    self.account, self.container, self.obj)
+
+            if not result:
+                return self._error_response(msg)
 
         if updated:
             blob.patch()

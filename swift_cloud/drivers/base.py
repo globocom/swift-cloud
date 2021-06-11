@@ -7,7 +7,3 @@ class BaseDriver:
     @abstractmethod
     def response(self):
         raise NotImplementedError
-
-    @abstractmethod
-    def cors_validation(func):
-        raise NotImplementedError
