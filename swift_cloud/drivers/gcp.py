@@ -1,14 +1,12 @@
 import io
 import json
 import logging
-import functools
 from uuid import uuid4
 
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
 from swift.common.header_key_dict import HeaderKeyDict
 from swift.common.exceptions import ChunkReadError
-from swift.proxy.controllers.base import cors_validation
 
 from google.cloud import storage
 from google.cloud.exceptions import NotFound, Conflict
@@ -16,6 +14,7 @@ from google.oauth2.service_account import Credentials
 
 from swift_cloud.drivers.base import BaseDriver
 from swift_cloud.tools import SwiftCloudTools
+from swift_cloud.decorators import cors_validation
 
 log = logging.getLogger(__name__)
 
