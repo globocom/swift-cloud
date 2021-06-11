@@ -111,7 +111,9 @@ class SwiftGCPDriverTestCase(TestCase):
     def setUpClass(cls):
         cls.conf = {
             'gcp_credentials': '/path/to/credentials.json',
-            'max_results': 999
+            'max_results': 999,
+            'tools_api_url': 'http://swift-cloud-tools',
+            'tools_api_token': 'token'
         }
         cls.account_info = {
             'meta': {'cloud': 'gcp'}
