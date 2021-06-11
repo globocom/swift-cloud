@@ -571,11 +571,17 @@ class SwiftGCPDriver(BaseDriver):
 
         _, blob = self.update_object_headers(blob)
 
-        delete_at = blob.metadata.get('x-delete-at')
+        metadata = blob.metadata or {}
+        delete_at = metadata.get('x-delete-at')
 
         if delete_at:
+            result, date = self.tools.convert_timestamp_to_datetime(delete_at)
+
+            if not result:
+                return self._error_response(date)
+
             result, msg = self.tools.add_delete_at(
-                self.account, self.container, self.obj, delete_at)
+                self.account, self.container, self.obj, date)
 
             if not result:
                 return self._error_response(msg)
@@ -614,12 +620,18 @@ class SwiftGCPDriver(BaseDriver):
 
         updated, blob = self.update_object_headers(blob)
 
-        delete_at = blob.metadata.get('x-delete-at')
+        metadata = blob.metadata or {}
+        delete_at = metadata.get('x-delete-at')
 
         if delete_at:
             if delete_at != '':
+                result, date = self.tools.convert_timestamp_to_datetime(delete_at)
+
+                if not result:
+                    return self._error_response(date)
+
                 result, msg = self.tools.add_delete_at(
-                    self.account, self.container, self.obj, delete_at)
+                    self.account, self.container, self.obj, date)
             else:
                 result, msg = self.tools.remove_delete_at(
                     self.account, self.container, self.obj)
