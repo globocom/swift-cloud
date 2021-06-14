@@ -658,16 +658,12 @@ class SwiftGCPDriver(BaseDriver):
             return self._default_response('', 404)
 
         headers = self.get_object_headers(blob)
-        log.error('################ headers ################')
-        log.error(headers)
         delete_at = headers.get('x-delete-at')
-        log.error(delete_at)
+
         if delete_at:
-            log.error('################ if delete_at: ################')
             result, msg = self.tools.remove_delete_at(
                 self.account, self.container, self.obj)
-            log.error(result)
-            log.error(msg)
+
             if not result:
                 return self._error_response(msg)
 

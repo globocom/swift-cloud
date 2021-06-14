@@ -35,7 +35,6 @@ class SwiftCloudTools:
 
     def remove_delete_at(self, account, container, obj):
         try:
-            log.error('################ remove_delete_at ################')
             res = requests.delete(self.expirer_url,
                 data=json.dumps({
                     'account': account,
@@ -46,8 +45,6 @@ class SwiftCloudTools:
                     'Content-Type': 'application/json',
                     'X-Auth-Token': self.api_token
                 })
-            log.error(res)
-            log.error(res.text)
             return True, res.text
         except Exception as err:
             log.error(err)
