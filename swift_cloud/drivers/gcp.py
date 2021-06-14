@@ -492,7 +492,7 @@ class SwiftGCPDriver(BaseDriver):
 
         if blob.metadata:
             for key in blob.metadata.keys():
-                metadata[key] = None
+                metadata[key] = blob.metadata[key]
 
         for item in meta_keys:
             key = item.lower().split('x-object-meta-')[-1]
@@ -515,7 +515,7 @@ class SwiftGCPDriver(BaseDriver):
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
-        if not blob.exists():
+        if not blob or not blob.exists():
             return self._default_response('', 404)
 
         metadata = blob.metadata or {}
@@ -552,7 +552,7 @@ class SwiftGCPDriver(BaseDriver):
         obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
-        if not blob.exists():
+        if not blob or not blob.exists():
             return self._default_response('', 404)
 
         headers = self.get_object_headers(blob)
@@ -573,7 +573,7 @@ class SwiftGCPDriver(BaseDriver):
         metadata = blob.metadata or {}
         delete_at = metadata.get('x-delete-at')
 
-        if delete_at:
+        if delete_at and delete_at != '':
             result, date = self.tools.convert_timestamp_to_datetime(delete_at)
 
             if not result:
@@ -614,32 +614,36 @@ class SwiftGCPDriver(BaseDriver):
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
-        if not blob.exists():
+        if not blob or not blob.exists():
             return self._default_response('', 404)
 
-        updated, blob = self.update_object_headers(blob)
+        _, blob = self.update_object_headers(blob)
 
         metadata = blob.metadata or {}
-        delete_at = metadata.get('x-delete-at')
+        delete_at = self.req.headers.get('x-delete-at')
+        remove_delete_at = self.req.headers.get('x-remove-delete-at')
 
-        if delete_at:
-            if delete_at != '':
-                result, date = self.tools.convert_timestamp_to_datetime(delete_at)
+        if (delete_at and delete_at == '') or remove_delete_at:
+            metadata['x-delete-at'] = None
+            result, msg = self.tools.remove_delete_at(
+                self.account, self.container, self.obj)
 
-                if not result:
-                    return self._error_response(date)
+            if not result:
+                return self._error_response(msg)
+        elif delete_at and delete_at != '':
+            result, date = self.tools.convert_timestamp_to_datetime(delete_at)
 
-                result, msg = self.tools.add_delete_at(
-                    self.account, self.container, self.obj, date)
-            else:
-                result, msg = self.tools.remove_delete_at(
-                    self.account, self.container, self.obj)
+            if not result:
+                return self._error_response(date)
+
+            result, msg = self.tools.add_delete_at(
+                self.account, self.container, self.obj, date)
 
             if not result:
                 return self._error_response(msg)
 
-        if updated:
-            blob.patch()
+        blob.metadata = metadata
+        blob.patch()
 
         return self._default_response('', 202)  # Accepted
 
@@ -650,8 +654,18 @@ class SwiftGCPDriver(BaseDriver):
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
-        if not blob.exists():
+        if not blob or not blob.exists():
             return self._default_response('', 404)
+
+        headers = self.get_object_headers(blob)
+        delete_at = headers.get('x-delete-at')
+
+        if delete_at:
+            result, msg = self.tools.remove_delete_at(
+                self.account, self.container, self.obj)
+
+            if not result:
+                return self._error_response(msg)
 
         blob.delete()
 
