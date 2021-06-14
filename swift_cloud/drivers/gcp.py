@@ -571,7 +571,7 @@ class SwiftGCPDriver(BaseDriver):
         _, blob = self.update_object_headers(blob)
 
         metadata = blob.metadata or {}
-        delete_at = metadata.get('x-delete-at')
+        delete_at = self.req.headers.get('x-delete-at')
 
         if delete_at and delete_at != '':
             result, date = self.tools.convert_timestamp_to_datetime(delete_at)
