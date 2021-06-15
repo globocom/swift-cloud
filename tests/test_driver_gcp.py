@@ -410,3 +410,54 @@ class SwiftGCPDriverTestCase(TestCase):
         res = self._driver('/v1/account/container/object', 'HEAD').response()
         self.assertIn('Content-Type', res.headers)
         self.assertIn('Etag', res.headers)
+
+    @patch('swift_cloud.tools.SwiftCloudTools.add_delete_at')
+    def test_call_post_object_add_delete_at(self, mock_add):
+        mock_add.return_value = True, 'ok'
+        headers = {"x-delete-at": 1623767403}
+        res = self._driver('/v1/account/container/object', 'POST', headers).response()
+        self.assertEquals(res.status_int, 202)
+
+    @patch('swift_cloud.tools.SwiftCloudTools.remove_delete_at')
+    def test_call_post_object_add_delete_at(self, mock_remove):
+        mock_remove.return_value = True, 'ok'
+        headers = {"x-delete-at": ''}
+        res = self._driver('/v1/account/container/object', 'POST', headers).response()
+        self.assertEquals(res.status_int, 202)
+
+    @patch('swift_cloud.tools.SwiftCloudTools.add_delete_at')
+    def test_post_object_delete_at_fails_returns_error(self, mock_add):
+        mock_add.return_value = False, 'Error'
+        headers = {"x-delete-at": 1623767403}
+        res = self._driver('/v1/account/container/object', 'POST', headers).response()
+        self.assertIn(res.body, '{"error": "Error"}')
+
+    @patch('swift_cloud.tools.SwiftCloudTools.convert_timestamp_to_datetime')
+    def test_object_delete_at_invalid_date_returns_error(self, mock_date):
+        mock_date.return_value = False, 'Error'
+        headers = {"x-delete-at": 1623767403}
+        res = self._driver('/v1/account/container/object', 'POST', headers).response()
+        self.assertIn(res.body, '{"error": "Error"}')
+
+    @patch('swift_cloud.tools.SwiftCloudTools.add_delete_at')
+    def test_call_put_object_add_delete_at(self, mock_add):
+        mock_add.return_value = True, 'ok'
+        headers = {"x-delete-at": 1623767403}
+        res = self._driver('/v1/account/container/object', 'PUT', headers).response()
+        self.assertEquals(res.status_int, 201)
+
+    @patch('swift_cloud.tools.SwiftCloudTools.remove_delete_at')
+    def test_call_post_object_add_delete_at(self, mock_remove):
+        mock_remove.return_value = True, 'ok'
+        headers = {"x-delete-at": ''}
+        res = self._driver('/v1/account/container/object', 'PUT', headers).response()
+        self.assertEquals(res.status_int, 201)
+
+    @patch('swift_cloud.tools.SwiftCloudTools.add_delete_at')
+    def test_put_object_delete_at_fails_returns_error(self, mock_add):
+        mock_add.return_value = False, 'Error'
+        headers = {"x-delete-at": 1623767403}
+        res = self._driver('/v1/account/container/object', 'PUT', headers).response()
+        self.assertEquals(res.status_int, 500)
+
+
