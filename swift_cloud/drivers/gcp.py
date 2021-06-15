@@ -560,6 +560,29 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response(
             blob.download_as_bytes(), 200, headers)
 
+    def update_delete_at(self, blob):
+        result = True
+        delete_at = blob.metadata.get('x-delete-at')
+        remove_delete_at = blob.metadata.get('x-remove-delete-at')
+
+        if delete_at != '':
+            result, date = self.tools.convert_timestamp_to_datetime(delete_at)
+
+            if not result:
+                return False, blob
+
+            result, msg = self.tools.add_delete_at(
+                self.account, self.container, self.obj, date)
+            log.info(msg)
+
+        if delete_at == '' or remove_delete_at:
+            blob.metadata['x-delete-at'] = None
+            result, msg = self.tools.remove_delete_at(
+                self.account, self.container, self.obj)
+            log.info(msg)
+
+        return True, blob
+
     @cors_validation
     def put_object(self, req, bucket=None, obj=None):
         if not bucket:
@@ -570,20 +593,10 @@ class SwiftGCPDriver(BaseDriver):
 
         _, blob = self.update_object_headers(blob)
 
-        metadata = blob.metadata or {}
-        delete_at = self.req.headers.get('x-delete-at')
-
-        if delete_at and delete_at != '':
-            result, date = self.tools.convert_timestamp_to_datetime(delete_at)
-
-            if not result:
-                return self._error_response(date)
-
-            result, msg = self.tools.add_delete_at(
-                self.account, self.container, self.obj, date)
-
-            if not result:
-                return self._error_response(msg)
+        if blob.metadata.get('x-delete-at'):
+            delete_at_result, blob = self.update_delete_at(blob)
+            if not delete_at_result:
+                return self._error_response('X-Delete-At Error.')
 
         def reader():
             try:
@@ -617,33 +630,15 @@ class SwiftGCPDriver(BaseDriver):
         if not blob or not blob.exists():
             return self._default_response('', 404)
 
-        _, blob = self.update_object_headers(blob)
+        updated, blob = self.update_object_headers(blob)
 
-        metadata = blob.metadata or {}
-        delete_at = self.req.headers.get('x-delete-at')
-        remove_delete_at = self.req.headers.get('x-remove-delete-at')
+        if blob.metadata.get('x-delete-at'):
+            delete_at_result, blob = self.update_delete_at(blob)
+            if not delete_at_result:
+                return self._error_response('X-Delete-At Error.')
 
-        if (delete_at and delete_at == '') or remove_delete_at:
-            metadata['x-delete-at'] = None
-            result, msg = self.tools.remove_delete_at(
-                self.account, self.container, self.obj)
-
-            if not result:
-                return self._error_response(msg)
-        elif delete_at and delete_at != '':
-            result, date = self.tools.convert_timestamp_to_datetime(delete_at)
-
-            if not result:
-                return self._error_response(date)
-
-            result, msg = self.tools.add_delete_at(
-                self.account, self.container, self.obj, date)
-
-            if not result:
-                return self._error_response(msg)
-
-        blob.metadata = metadata
-        blob.patch()
+        if updated:
+            blob.patch()
 
         return self._default_response('', 202)  # Accepted
 
