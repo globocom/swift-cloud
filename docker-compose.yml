@@ -12,7 +12,7 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: 1
     networks:
         swift_cloud_net:
-            ipv4_address: 10.5.0.5
+            ipv4_address: 10.9.0.5
 
   keystone:
     container_name: keystone
@@ -27,7 +27,7 @@ services:
       - 5000:5000
     networks:
         swift_cloud_net:
-            ipv4_address: 10.5.0.6
+            ipv4_address: 10.9.0.6
 
   fake_swift:
     container_name: fake_swift
@@ -45,10 +45,10 @@ services:
     environment:
       FLASK_ENV: development
     extra_hosts:
-      localhost: 10.5.0.6
+      localhost: 10.9.0.6
     networks:
         swift_cloud_net:
-            ipv4_address: 10.5.0.7
+            ipv4_address: 10.9.0.7
 
 volumes:
   vol_database:
@@ -59,4 +59,4 @@ networks:
         driver: bridge
         ipam:
             config:
-                - subnet: 10.5.0.0/16
+                - subnet: 10.9.0.0/16
