@@ -89,12 +89,13 @@ class SwiftGCPDriver(BaseDriver):
         elif account and not container and not obj:
             return self.handle_account()
 
-        return self._default_response(b'Invalid request path', 500)
+        return self._error_response(b'Invalid request path')
 
     def _get_client(self):
         try:
             credentials_path = self.conf.get('gcp_credentials')
-            credentials = Credentials.from_service_account_file(credentials_path)
+            credentials = Credentials.from_service_account_file(
+                credentials_path)
             return storage.Client(credentials=credentials)
         except Exception as err:
             log.error(err)
@@ -113,10 +114,10 @@ class SwiftGCPDriver(BaseDriver):
                         headers=HeaderKeyDict(**self.headers),
                         request=self.req)
 
-    def _error_response(self, error):
+    def _error_response(self, error, status=500):
         self.headers['Content-Type'] = 'application/json; charset=utf-8'
         body = {'error': str(error)}
-        return Response(body=json.dumps(body), status=500,
+        return Response(body=json.dumps(body), status=status,
                         headers=HeaderKeyDict(**self.headers),
                         request=self.req)
 
@@ -147,7 +148,8 @@ class SwiftGCPDriver(BaseDriver):
         try:
             return self.client.get_bucket(bucket_name)
         except NotFound:
-            bucket = self.client.create_bucket(bucket_name, location=BUCKET_LOCATION)
+            bucket = self.client.create_bucket(
+                bucket_name, location=BUCKET_LOCATION)
             bucket.iam_configuration.uniform_bucket_level_access_enabled = False
             bucket.patch()
             return bucket
@@ -206,7 +208,8 @@ class SwiftGCPDriver(BaseDriver):
         for item in containers:
             folder_blobs = list(account_bucket.list_blobs(prefix=item.name))
             container_list.append({
-                'count': len(folder_blobs) - 1,  # all blobs except main folder (container)
+                # all blobs except main folder (container)
+                'count': len(folder_blobs) - 1,
                 'bytes': blobs_size(folder_blobs),
                 'name': item.name.replace('/', ''),
                 'last_modified': item.updated.isoformat()
@@ -235,7 +238,7 @@ class SwiftGCPDriver(BaseDriver):
             account_bucket = self.client.get_bucket(bucket_name)
             account_bucket.delete()
         except NotFound:
-            return self._error_response('Account not found.')
+            return self._default_response('Account not found.', 404)
         except Conflict:
             return self._error_response('Account must be empty.')
 
@@ -328,7 +331,8 @@ class SwiftGCPDriver(BaseDriver):
             if not bucket:
                 bucket = self.client.get_bucket(self.account)
         except NotFound:
-            bucket = self.client.create_bucket(self.account, location=BUCKET_LOCATION)
+            bucket = self.client.create_bucket(
+                self.account, location=BUCKET_LOCATION)
             bucket.iam_configuration.uniform_bucket_level_access_enabled = False
             bucket.patch()
         except Exception as err:
@@ -336,7 +340,8 @@ class SwiftGCPDriver(BaseDriver):
             return self._error_response(err)
 
         blob = bucket.blob(self.container + '/')
-        blob.upload_from_string('', content_type='application/directory;charset=UTF-8')
+        blob.upload_from_string(
+            '', content_type='application/directory;charset=UTF-8')
 
         return self._default_response('', 201)
 
