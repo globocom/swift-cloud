@@ -430,14 +430,14 @@ class SwiftGCPDriverTestCase(TestCase):
         mock_add.return_value = False, 'Error'
         headers = {"x-delete-at": 1623767403}
         res = self._driver('/v1/account/container/object', 'POST', headers).response()
-        self.assertIn(res.body, '{"error": "Error"}')
+        self.assertIn(res.body, '{"error": "X-Delete-At Error"}')
 
     @patch('swift_cloud.tools.SwiftCloudTools.convert_timestamp_to_datetime')
     def test_object_delete_at_invalid_date_returns_error(self, mock_date):
         mock_date.return_value = False, 'Error'
         headers = {"x-delete-at": 1623767403}
         res = self._driver('/v1/account/container/object', 'POST', headers).response()
-        self.assertIn(res.body, '{"error": "Error"}')
+        self.assertIn(res.body, '{"error": "X-Delete-At Error"}')
 
     @patch('swift_cloud.tools.SwiftCloudTools.add_delete_at')
     def test_call_put_object_add_delete_at(self, mock_add):
@@ -459,5 +459,3 @@ class SwiftGCPDriverTestCase(TestCase):
         headers = {"x-delete-at": 1623767403}
         res = self._driver('/v1/account/container/object', 'PUT', headers).response()
         self.assertEquals(res.status_int, 500)
-
-

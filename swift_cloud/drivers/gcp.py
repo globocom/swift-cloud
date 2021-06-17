@@ -562,10 +562,10 @@ class SwiftGCPDriver(BaseDriver):
 
     def update_delete_at(self, blob):
         result = True
-        delete_at = blob.metadata.get('x-delete-at')
-        remove_delete_at = blob.metadata.get('x-remove-delete-at')
+        delete_at = self.req.headers.get('x-delete-at')
+        remove_delete_at = self.req.headers.get('x-remove-delete-at')
 
-        if delete_at != '':
+        if delete_at and delete_at != '':
             result, date = self.tools.convert_timestamp_to_datetime(delete_at)
 
             if not result:
@@ -575,11 +575,18 @@ class SwiftGCPDriver(BaseDriver):
                 self.account, self.container, self.obj, date)
             log.info(msg)
 
-        if delete_at == '' or remove_delete_at:
+            if not result:
+                return False, blob
+
+        if (delete_at and delete_at == '') or remove_delete_at:
             blob.metadata['x-delete-at'] = None
+
             result, msg = self.tools.remove_delete_at(
                 self.account, self.container, self.obj)
             log.info(msg)
+
+            if not result:
+                return False, blob
 
         return True, blob
 
@@ -593,10 +600,10 @@ class SwiftGCPDriver(BaseDriver):
 
         _, blob = self.update_object_headers(blob)
 
-        if blob.metadata.get('x-delete-at'):
+        if self.req.headers.get('x-delete-at'):
             delete_at_result, blob = self.update_delete_at(blob)
             if not delete_at_result:
-                return self._error_response('X-Delete-At Error.')
+                return self._error_response('X-Delete-At Error')
 
         def reader():
             try:
@@ -617,6 +624,7 @@ class SwiftGCPDriver(BaseDriver):
         blob.upload_from_string(obj_data, content_type=content_type)
 
         headers = self.get_object_headers(blob)
+        headers['Content-Length'] = 0
 
         return self._default_response('', 201, headers)
 
@@ -632,10 +640,10 @@ class SwiftGCPDriver(BaseDriver):
 
         updated, blob = self.update_object_headers(blob)
 
-        if blob.metadata.get('x-delete-at'):
-            delete_at_result, blob = self.update_delete_at(blob)
-            if not delete_at_result:
-                return self._error_response('X-Delete-At Error.')
+        delete_at_result, blob = self.update_delete_at(blob)
+
+        if not delete_at_result:
+            return self._error_response('X-Delete-At Error')
 
         if updated:
             blob.patch()
