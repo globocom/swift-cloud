@@ -21,11 +21,15 @@ class SwiftCloudMiddleware(object):
         self.conf = conf
         self.providers = conf.get('cloud_providers').split()
 
-    def gcp_handler(self, req, account_info):
+    def gcp_handler(self, req, account_info, has_account):
         driver = SwiftGCPDriver(req, account_info, self.app, self.conf)
+        http_verbs = ['HEAD', 'GET', 'POST', 'DELETE']
         resp = driver.response()
 
-        if req.method in ['GET', 'HEAD', 'POST', 'DELETE'] and resp.status_int == 404:
+        if req.method == 'POST' and has_account:
+            return self.app
+
+        if req.method in http_verbs and resp.status_int == 404:
             return self.app
 
         return resp
@@ -42,17 +46,13 @@ class SwiftCloudMiddleware(object):
 
         if cloud_name and cloud_name in self.providers:
             req = Request(environ)
-            has_account = account and not container and not obj
-
             handler = self.app
+
             if cloud_name == 'gcp':
-                handler = self.gcp_handler(req, account_info)
+                has_account = account and not container and not obj
+                handler = self.gcp_handler(req, account_info, has_account)
 
-            http_verbs = ['HEAD', 'GET', 'POST', 'DELETE']
-
-            if req.method in http_verbs and not has_account:
-                if handler.status_int != 404:
-                    return handler(environ, start_response)
+            return handler(environ, start_response)
 
         return self.app(environ, start_response)
 
