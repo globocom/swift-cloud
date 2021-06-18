@@ -23,7 +23,12 @@ class SwiftCloudMiddleware(object):
 
     def gcp_handler(self, req, account_info):
         driver = SwiftGCPDriver(req, account_info, self.app, self.conf)
-        return driver.response()
+        resp = driver.response()
+
+        if req.method in ['GET', 'HEAD', 'POST', 'DELETE'] and resp.status_int == 404:
+            return self.app
+
+        return resp
 
     def __call__(self, environ, start_response):
         try:
