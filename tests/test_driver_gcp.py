@@ -150,7 +150,7 @@ class SwiftGCPDriverTestCase(TestCase):
 
     def test_invalid_request_path(self):
         res = self._driver('/invalid-path').response()
-        self.assertEquals(res.body, 'Invalid request path')
+        self.assertEquals(res.body, '{"error": "Invalid request path"}')
 
     @patch('swift_cloud.drivers.gcp.SwiftGCPDriver.handle_account')
     def test_call_account_handler(self, mock_handle_account):

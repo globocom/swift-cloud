@@ -283,7 +283,7 @@ class SwiftGCPDriver(BaseDriver):
             'X-Container-Bytes-Used': blobs_size(objects)
         }
 
-        if blob.metadata:
+        if blob and blob.metadata:
             for key, value in blob.metadata.items():
                 headers['X-Container-{}'.format(key)] = value
 
@@ -599,6 +599,12 @@ class SwiftGCPDriver(BaseDriver):
     def put_object(self, req, bucket=None, obj=None):
         if not bucket:
             bucket = self.client.get_bucket(self.account)
+
+        blob = bucket.get_blob(self.container + '/')
+
+        if not blob:
+            return self._default_response('The resource could not be found', 404)
+
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.blob(obj_path)
         content_type = self.req.headers.get('Content-Type')
