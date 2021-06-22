@@ -1,6 +1,8 @@
 import io
 import json
+import pytz
 import logging
+import datetime
 from uuid import uuid4
 
 from swift.common.swob import Response, wsgi_to_str
@@ -568,7 +570,10 @@ class SwiftGCPDriver(BaseDriver):
     def update_delete_at(self, blob):
         result = True
         delete_at = self.req.headers.get('x-delete-at')
+        delete_after = self.req.headers.get('x-delete-after')
         remove_delete_at = self.req.headers.get('x-remove-delete-at')
+        remove_delete_after = self.req.headers.get('x-remove-delete-after')
+        date = None
 
         if delete_at and delete_at != '':
             result, date = self.tools.convert_timestamp_to_datetime(delete_at)
@@ -576,6 +581,17 @@ class SwiftGCPDriver(BaseDriver):
             if not result:
                 return False, blob
 
+        if delete_after and delete_after != '':
+            try:
+                seconds = int(delete_after)
+            except ValueError:
+                return False, blob
+
+            now_time = datetime.datetime.now(pytz.timezone('Brazil/East'))
+            date_time = now_time + datetime.timedelta(seconds=seconds)
+            date = date_time.strftime('%Y-%m-%d %H:%M:%S')
+
+        if date:
             result, msg = self.tools.add_delete_at(
                 self.account, self.container, self.obj, date)
             log.info(msg)
@@ -583,8 +599,17 @@ class SwiftGCPDriver(BaseDriver):
             if not result:
                 return False, blob
 
-        if (delete_at and delete_at == '') or remove_delete_at:
-            blob.metadata['x-delete-at'] = None
+        empty_del_at = delete_at and delete_at == ''
+        empty_del_after = delete_after and delete_after == ''
+
+        if empty_del_at or empty_del_after or remove_delete_at or remove_delete_after:
+            metadata = blob.metadata or {}
+
+            if metadata.get('x-delete-at'):
+                blob.metadata['x-delete-at'] = None
+
+            if metadata.get('x-delete-after'):
+                blob.metadata['x-delete-after'] = None
 
             result, msg = self.tools.remove_delete_at(
                 self.account, self.container, self.obj)
@@ -608,13 +633,15 @@ class SwiftGCPDriver(BaseDriver):
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.blob(obj_path)
         content_type = self.req.headers.get('Content-Type')
+        delete_at = self.req.headers.get('x-delete-at')
+        delete_after = self.req.headers.get('x-delete-after')
 
         _, blob = self.update_object_headers(blob)
 
-        if self.req.headers.get('x-delete-at'):
+        if delete_at or delete_after:
             delete_at_result, blob = self.update_delete_at(blob)
             if not delete_at_result:
-                return self._error_response('X-Delete-At Error')
+                return self._error_response('X-Delete Error')
 
         def reader():
             try:
@@ -654,7 +681,7 @@ class SwiftGCPDriver(BaseDriver):
         delete_at_result, blob = self.update_delete_at(blob)
 
         if not delete_at_result:
-            return self._error_response('X-Delete-At Error')
+            return self._error_response('X-Delete Error')
 
         if updated:
             blob.patch()
