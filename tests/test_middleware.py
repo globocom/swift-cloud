@@ -22,7 +22,8 @@ class MiddlewareTestCase(TestCase):
             'cloud_providers': 'cloudone',
             'max_results': 999,
             'tools_api_url': 'http://swift-cloud-tools',
-            'tools_api_token': 'token'
+            'tools_api_token': 'token',
+            'x_cloud_bypass': '123456'
         }
         cls.fake_app = FakeApp()
         cls.app = SwiftCloudMiddleware(cls.fake_app, cls.conf)

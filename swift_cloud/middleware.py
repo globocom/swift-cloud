@@ -20,6 +20,7 @@ class SwiftCloudMiddleware(object):
         self.app = app
         self.conf = conf
         self.providers = conf.get('cloud_providers').split()
+        self.x_cloud_bypass = conf.get('x_cloud_bypass')
 
     def gcp_handler(self, req, account_info, has_account):
         driver = SwiftGCPDriver(req, account_info, self.app, self.conf)
@@ -43,6 +44,10 @@ class SwiftCloudMiddleware(object):
 
         account_info = get_account_info(environ, self.app)
         cloud_name = account_info['meta'].get('cloud')
+        x_cloud_bypass = environ.get('HTTP_X_CLOUD_BYPASS')
+
+        if x_cloud_bypass == self.x_cloud_bypass:
+            return self.app(environ, start_response)
 
         if cloud_name and cloud_name in self.providers:
             req = Request(environ)
