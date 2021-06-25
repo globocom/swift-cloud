@@ -21,7 +21,7 @@ from swift_cloud.decorators import cors_validation
 log = logging.getLogger(__name__)
 
 BUCKET_LOCATION = 'SOUTHAMERICA-EAST1'
-RESERVED_META = ['x-delete-at', 'x-delete-after']
+RESERVED_META = ['x-delete-at', 'x-delete-after', 'x-versions-location', 'x-history-location']
 
 
 def is_container(blob):
@@ -287,7 +287,10 @@ class SwiftGCPDriver(BaseDriver):
 
         if blob and blob.metadata:
             for key, value in blob.metadata.items():
-                headers['X-Container-{}'.format(key)] = value
+                if key not in RESERVED_META:
+                    headers['X-Container-{}'.format(key)] = value
+                else:
+                    headers[key] = value
 
         return self._default_response('', 204, headers)
 
@@ -390,11 +393,14 @@ class SwiftGCPDriver(BaseDriver):
                 continue
 
             if key == 'X-Versions-Location' or key == 'X-History-Location':
+                metadata["x-versions-location"] = 'versions'
                 bucket.versioning_enabled = True
                 bucket.patch()
                 continue
 
             if key == 'X-Remove-Versions-Location' or key == 'X-Remove-History-Location':
+                if metadata.get('x-versions-location'):
+                    metadata["x-versions-location"] = None
                 bucket.versioning_enabled = False
                 bucket.patch()
                 continue
