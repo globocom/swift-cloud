@@ -393,16 +393,12 @@ class SwiftGCPDriver(BaseDriver):
                 continue
 
             if key == 'X-Versions-Location' or key == 'X-History-Location':
-                metadata["x-versions-location"] = 'versions'
-                bucket.versioning_enabled = True
-                bucket.patch()
+                metadata["x-versions-location"] = '_version_{}'.format(self.container)
                 continue
 
             if key == 'X-Remove-Versions-Location' or key == 'X-Remove-History-Location':
                 if metadata.get('x-versions-location'):
                     metadata["x-versions-location"] = None
-                bucket.versioning_enabled = False
-                bucket.patch()
                 continue
 
         blob.metadata = metadata
