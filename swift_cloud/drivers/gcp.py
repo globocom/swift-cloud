@@ -454,7 +454,10 @@ class SwiftGCPDriver(BaseDriver):
         headers = {
             'Content-Type': blob.content_type,
             'Etag': blob.etag,
-            'Last-Modified': blob.updated.isoformat()
+            'Last-Modified': datetime.datetime.strftime(
+                blob.updated,
+                '%a, %d %b %Y %H:%M:%S GMT'
+            )
         }
 
         if blob.cache_control:
