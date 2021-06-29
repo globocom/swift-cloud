@@ -21,7 +21,13 @@ from swift_cloud.decorators import cors_validation
 log = logging.getLogger(__name__)
 
 BUCKET_LOCATION = 'SOUTHAMERICA-EAST1'
-RESERVED_META = ['x-delete-at', 'x-delete-after', 'x-versions-location', 'x-history-location']
+RESERVED_META = [
+    'x-delete-at',
+    'x-delete-after',
+    'x-versions-location',
+    'x-history-location',
+    'x-undelete-enabled'
+]
 
 
 def is_container(blob):
@@ -287,7 +293,7 @@ class SwiftGCPDriver(BaseDriver):
 
         if blob and blob.metadata:
             for key, value in blob.metadata.items():
-                if key not in RESERVED_META:
+                if key.lower() not in RESERVED_META:
                     headers['X-Container-{}'.format(key)] = value
                 else:
                     headers[key] = value
@@ -300,6 +306,7 @@ class SwiftGCPDriver(BaseDriver):
             if not bucket:
                 bucket = self.client.get_bucket(self.account)
             prefix = '/'.join([self.container, self.prefix])
+            blob = bucket.get_blob(prefix)
             blobs = list(bucket.list_blobs(prefix=prefix))
             level = len(prefix[:-1].split('/'))
             pseudofolders = filter(lambda x: is_pseudofolder(level, x), blobs)
@@ -322,6 +329,13 @@ class SwiftGCPDriver(BaseDriver):
             'X-Container-Object-Count': len(object_list),
             'X-Container-Bytes-Used': blobs_size(objects)
         }
+
+        if blob and blob.metadata:
+            for key, value in blob.metadata.items():
+                if key.lower() not in RESERVED_META:
+                    headers['X-Container-{}'.format(key)] = value
+                else:
+                    headers[key] = value
 
         status = 200
         if self.req.params.get('marker'):  # TODO: pagination
@@ -348,6 +362,18 @@ class SwiftGCPDriver(BaseDriver):
         blob.upload_from_string(
             '', content_type='application/directory;charset=UTF-8')
 
+        metadata = blob.metadata or {}
+
+        for item in self.req.headers.iteritems():
+            key, value = item
+            key = key.lower()
+            if key == 'x-undelete-enabled':
+                metadata["x-undelete-enabled"] = value
+                break
+
+        blob.metadata = metadata
+        blob.patch()
+
         return self._default_response('', 201)
 
     @cors_validation
@@ -368,14 +394,15 @@ class SwiftGCPDriver(BaseDriver):
 
         for item in self.req.headers.iteritems():
             key, value = item
-            prefix = key.split('X-Container-Meta-')
+            key = key.lower()
+            prefix = key.split('x-container-meta-')
 
             if len(prefix) > 1:
                 meta = 'meta-{}'.format(prefix[1].lower())
                 metadata[meta] = item[1].lower()
                 continue
 
-            prefix = key.split('X-Remove-Container-Meta-')
+            prefix = key.split('x-remove-container-meta-')
 
             if len(prefix) > 1:
                 meta = 'meta-{}'.format(prefix[1].lower())
@@ -383,22 +410,26 @@ class SwiftGCPDriver(BaseDriver):
                     metadata[meta] = None
                 continue
 
-            if key == 'X-Container-Read' and value == '.r:*':
+            if key == 'x-container-read' and value == '.r:*':
                 metadata["read"] = value
                 continue
 
-            if (key == 'X-Container-Read' and value == '') or key == 'X-Remove-Container-Read':
+            if (key == 'x-container-read' and value == '') or key == 'x-remove-container-read':
                 if metadata.get('read'):
                     metadata["read"] = None
                 continue
 
-            if key == 'X-Versions-Location' or key == 'X-History-Location':
+            if key == 'x-versions-location' or key == 'x-history-location':
                 metadata["x-versions-location"] = '_version_{}'.format(self.container)
                 continue
 
-            if key == 'X-Remove-Versions-Location' or key == 'X-Remove-History-Location':
+            if key == 'x-remove-versions-location' or key == 'x-remove-history-location':
                 if metadata.get('x-versions-location'):
                     metadata["x-versions-location"] = None
+                continue
+
+            if key == 'x-undelete-enabled':
+                metadata["x-undelete-enabled"] = value
                 continue
 
         blob.metadata = metadata
@@ -470,7 +501,7 @@ class SwiftGCPDriver(BaseDriver):
 
         if blob.metadata:
             for key, value in blob.metadata.items():
-                if key not in RESERVED_META:
+                if key.lower() not in RESERVED_META:
                     headers['x-object-meta-{}'.format(key)] = value
                 else:
                     headers[key] = value
