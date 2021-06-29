@@ -26,7 +26,8 @@ RESERVED_META = [
     'x-delete-after',
     'x-versions-location',
     'x-history-location',
-    'x-undelete-enabled'
+    'x-undelete-enabled',
+    'x-container-sysmeta-undelete-enabled'
 ]
 
 
@@ -368,6 +369,7 @@ class SwiftGCPDriver(BaseDriver):
             key, value = item
             key = key.lower()
             if key == 'x-undelete-enabled':
+                metadata["x-container-sysmeta-undelete-enabled"] = value
                 metadata["x-undelete-enabled"] = value
                 break
 
@@ -429,6 +431,7 @@ class SwiftGCPDriver(BaseDriver):
                 continue
 
             if key == 'x-undelete-enabled':
+                metadata["x-container-sysmeta-undelete-enabled"] = value
                 metadata["x-undelete-enabled"] = value
                 continue
 
