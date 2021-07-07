@@ -345,53 +345,7 @@ class SwiftGCPDriver(BaseDriver):
 
         return self._json_response(object_list, status, headers)
 
-    @cors_validation
-    def put_container(self, req, bucket=None, obj=None):
-        try:
-            if not bucket:
-                bucket = self.client.get_bucket(self.account)
-        except NotFound:
-            bucket = self.client.create_bucket(
-                self.account, location=BUCKET_LOCATION)
-            bucket.iam_configuration.uniform_bucket_level_access_enabled = False
-            bucket.patch()
-        except Exception as err:
-            log.error(err)
-            return self._error_response(err)
-
-        blob = bucket.blob(self.container + '/')
-        blob.upload_from_string(
-            '', content_type='application/directory;charset=UTF-8')
-
-        metadata = blob.metadata or {}
-
-        for item in self.req.headers.iteritems():
-            key, value = item
-            key = key.lower()
-            if key == 'x-undelete-enabled':
-                metadata["x-container-sysmeta-undelete-enabled"] = value
-                metadata["x-undelete-enabled"] = value
-                break
-
-        blob.metadata = metadata
-        blob.patch()
-
-        return self._default_response('', 201)
-
-    @cors_validation
-    def post_container(self, req, bucket=None, obj=None):
-        try:
-            if not bucket:
-                bucket = self.client.get_bucket(self.account)
-        except Exception as err:
-            log.error(err)
-            return self._error_response(err)
-
-        blob = bucket.get_blob(self.container + '/')
-
-        if not blob:
-            return self._default_response('', 404)
-
+    def _set_container_metadata(self, blob):
         metadata = blob.metadata or {}
 
         for item in self.req.headers.iteritems():
@@ -434,6 +388,53 @@ class SwiftGCPDriver(BaseDriver):
                 metadata["x-container-sysmeta-undelete-enabled"] = value
                 metadata["x-undelete-enabled"] = value
                 continue
+
+            if key == 'x-container-sharding':
+                metadata["x-container-sharding"] = value
+                continue
+
+        return metadata
+
+    @cors_validation
+    def put_container(self, req, bucket=None, obj=None):
+        try:
+            if not bucket:
+                bucket = self.client.get_bucket(self.account)
+        except NotFound:
+            bucket = self.client.create_bucket(
+                self.account, location=BUCKET_LOCATION)
+            bucket.iam_configuration.uniform_bucket_level_access_enabled = False
+            bucket.patch()
+        except Exception as err:
+            log.error(err)
+            return self._error_response(err)
+
+        blob = bucket.blob(self.container + '/')
+        blob.upload_from_string(
+            '', content_type='application/directory;charset=UTF-8')
+
+        metadata = self._set_container_metadata(blob)
+
+        blob.metadata = metadata
+        blob.patch()
+
+        return self._default_response('', 201)
+
+    @cors_validation
+    def post_container(self, req, bucket=None, obj=None):
+        try:
+            if not bucket:
+                bucket = self.client.get_bucket(self.account)
+        except Exception as err:
+            log.error(err)
+            return self._error_response(err)
+
+        blob = bucket.get_blob(self.container + '/')
+
+        if not blob:
+            return self._default_response('', 404)
+
+        metadata = self._set_container_metadata(blob)
 
         blob.metadata = metadata
         blob.patch()
