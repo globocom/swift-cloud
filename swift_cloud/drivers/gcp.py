@@ -46,6 +46,11 @@ def is_pseudofolder(level, blob):
     return len(chunks) > 2 and chunks[-1] == '' and len(chunks) - 2 == level
 
 
+def all_objects(blob):
+    chunks = blob.name.split('/')
+    return len(chunks) >= 2 and chunks[-1] != ''
+
+
 def blobs_size(blob_list):
     size = 0
     for blob in blob_list:
@@ -177,8 +182,7 @@ class SwiftGCPDriver(BaseDriver):
         try:
             account_blobs = list(account_bucket.list_blobs())
             containers = filter(is_container, account_blobs)
-            level = 1
-            objects = filter(lambda x: is_object(level, x), account_blobs)
+            objects = filter(lambda x: all_objects(x), account_blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -207,8 +211,7 @@ class SwiftGCPDriver(BaseDriver):
         try:
             account_blobs = list(account_bucket.list_blobs())
             containers = filter(is_container, account_blobs)
-            level = 1
-            objects = filter(lambda x: is_object(level, x), account_blobs)
+            objects = filter(lambda x: all_objects(x), account_blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
