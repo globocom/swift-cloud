@@ -2,7 +2,6 @@ import io
 import json
 import pytz
 import logging
-import time
 import datetime
 from uuid import uuid4
 
@@ -12,8 +11,6 @@ from swift.common.header_key_dict import HeaderKeyDict
 from swift.common.exceptions import ChunkReadError
 
 from google.cloud import storage
-from google.cloud import monitoring_v3
-from google.cloud.monitoring_v3 import enums
 from google.cloud.exceptions import NotFound, Conflict
 from google.oauth2.service_account import Credentials
 
@@ -70,11 +67,7 @@ class SwiftGCPDriver(BaseDriver):
         self.conf = conf
 
         self.max_results = int(conf.get('max_results'))
-
-        self.credentials = Credentials.from_service_account_file(
-            conf.get('gcp_credentials'))
         self.client = self._get_client()
-        self.monitoring = self._get_monitoring_client()
 
         self.account = None
         self.container = None
@@ -114,14 +107,10 @@ class SwiftGCPDriver(BaseDriver):
 
     def _get_client(self):
         try:
-            return storage.Client(credentials=self.credentials)
-        except Exception as err:
-            log.error(err)
-            return None
-
-    def _get_monitoring_client(self):
-        try:
-            return monitoring_v3.MetricServiceClient(credentials=self.credentials)
+            credentials_path = self.conf.get('gcp_credentials')
+            credentials = Credentials.from_service_account_file(
+                credentials_path)
+            return storage.Client(credentials=credentials)
         except Exception as err:
             log.error(err)
             return None
@@ -181,37 +170,6 @@ class SwiftGCPDriver(BaseDriver):
         except Exception as err:
             log.error(err)
             return None
-
-    def _get_bucket_metric(self, metric_type):
-        project_name = 'projects/{}'.format(self.credentials.project_id)
-        bucket_name = self.account
-        seconds = int(time.time())
-
-        interval = monitoring_v3.types.TimeInterval(
-            end_time={"seconds": seconds},
-            start_time={"seconds": (seconds - 1200)})  # 20 minutes
-
-        aggregation = monitoring_v3.types.Aggregation()
-        aggregation.alignment_period.seconds = 1200  # 20 minutes
-        aggregation.per_series_aligner = (
-            monitoring_v3.enums.Aggregation.Aligner.ALIGN_MEAN)
-
-        return self.monitoring.list_time_series(
-            project_name,
-            'metric.type = "{}" \
-             AND resource.type = gcs_bucket \
-             AND resource.labels.bucket_name = "{}"'.format(metric_type, bucket_name),
-            interval,
-            enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
-            aggregation
-        )
-
-    def _bucket_monitoring_info(self, bucket_name):
-        object_count = self._get_bucket_metric(
-            'storage.googleapis.com/storage/object_count')
-
-        total_bytes = self._get_bucket_metric(
-            'storage.googleapis.com/storage/total_bytes')
 
     def head_account(self):
         account_bucket = self._get_or_create_bucket(self.account)

@@ -9,7 +9,6 @@ setup(
     install_requires=[
         'swift==2.22.0',
         'google-cloud-storage==1.36.2',
-        'google-cloud-monitoring==1.1.0',
         'requests'
     ],
     packages=find_packages(),
