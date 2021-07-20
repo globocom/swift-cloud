@@ -22,13 +22,10 @@ class SwiftCloudMiddleware(object):
         self.providers = conf.get('cloud_providers').split()
         self.x_cloud_bypass = conf.get('x_cloud_bypass')
 
-    def gcp_handler(self, req, account_info, has_account):
+    def gcp_handler(self, req, account_info):
         driver = SwiftGCPDriver(req, account_info, self.app, self.conf)
         http_verbs = ['HEAD', 'GET', 'POST', 'DELETE']
         resp = driver.response()
-
-        if req.method == 'POST' and has_account:
-            return self.app
 
         if req.method in http_verbs and resp.status_int == 404:
             return self.app
@@ -54,8 +51,7 @@ class SwiftCloudMiddleware(object):
             handler = self.app
 
             if cloud_name == 'gcp':
-                has_account = account and not container and not obj
-                handler = self.gcp_handler(req, account_info, has_account)
+                handler = self.gcp_handler(req, account_info)
 
             return handler(environ, start_response)
 
