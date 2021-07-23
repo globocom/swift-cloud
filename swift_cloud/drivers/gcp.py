@@ -48,7 +48,7 @@ def is_pseudofolder(level, blob):
 
 def all_objects(blob):
     chunks = blob.name.split('/')
-    return len(chunks) >= 2 and chunks[-1] != ''
+    return (len(chunks) == 2 and chunks[-1] != '') or (len(chunks) > 2 and 'application/directory' not in blob.content_type)
 
 
 def blobs_size(blob_list):
@@ -160,7 +160,10 @@ class SwiftGCPDriver(BaseDriver):
 
     def _get_or_create_bucket(self, bucket_name):
         try:
-            return self.client.get_bucket(bucket_name)
+            return self.client.get_bucket(
+                bucket_name,
+                timeout=30
+            )
         except NotFound:
             bucket = self.client.create_bucket(
                 bucket_name, location=BUCKET_LOCATION)
@@ -247,7 +250,10 @@ class SwiftGCPDriver(BaseDriver):
 
     def delete_account(self):
         try:
-            account_bucket = self.client.get_bucket(bucket_name)
+            account_bucket = self.client.get_bucket(
+                bucket_name,
+                timeout=30
+            )
             account_bucket.delete()
         except NotFound:
             return self._default_response('Account not found.', 404)
@@ -280,7 +286,10 @@ class SwiftGCPDriver(BaseDriver):
     def head_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
-                bucket = self.client.get_bucket(self.account)
+                bucket = self.client.get_bucket(
+                    self.account,
+                    timeout=30
+                )
             prefix = '/'.join([self.container, self.prefix])
             blob = bucket.get_blob(prefix)
             container_blobs = list(bucket.list_blobs(prefix=prefix))
@@ -308,7 +317,10 @@ class SwiftGCPDriver(BaseDriver):
     def get_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
-                bucket = self.client.get_bucket(self.account)
+                bucket = self.client.get_bucket(
+                    self.account,
+                    timeout=30
+                )
             prefix = '/'.join([self.container, self.prefix])
             blob = bucket.get_blob(prefix)
             blobs = list(bucket.list_blobs(prefix=prefix))
@@ -402,7 +414,10 @@ class SwiftGCPDriver(BaseDriver):
     def put_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
-                bucket = self.client.get_bucket(self.account)
+                bucket = self.client.get_bucket(
+                    self.account,
+                    timeout=30
+                )
         except NotFound:
             bucket = self.client.create_bucket(
                 self.account, location=BUCKET_LOCATION)
@@ -427,7 +442,10 @@ class SwiftGCPDriver(BaseDriver):
     def post_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
-                bucket = self.client.get_bucket(self.account)
+                bucket = self.client.get_bucket(
+                    self.account,
+                    timeout=30
+                )
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -448,7 +466,10 @@ class SwiftGCPDriver(BaseDriver):
     def delete_container(self, req, bucket=None, obj=None):
         try:
             if not bucket:
-                bucket = self.client.get_bucket(self.account)
+                bucket = self.client.get_bucket(
+                    self.account,
+                    timeout=30
+                )
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -561,7 +582,10 @@ class SwiftGCPDriver(BaseDriver):
     @cors_validation
     def head_object(self, req, bucket=None, obj=None):
         if not bucket:
-            bucket = self.client.get_bucket(self.account)
+            bucket = self.client.get_bucket(
+                self.account,
+                timeout=30
+            )
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
@@ -583,7 +607,10 @@ class SwiftGCPDriver(BaseDriver):
     @cors_validation
     def get_object(self, req, bucket=None, blob=None):
         if not bucket:
-            bucket = self.client.get_bucket(self.account)
+            bucket = self.client.get_bucket(
+                self.account,
+                timeout=30
+            )
 
         if not blob:
             blob = bucket.get_blob(self.container + '/')
@@ -666,7 +693,10 @@ class SwiftGCPDriver(BaseDriver):
     @cors_validation
     def put_object(self, req, bucket=None, obj=None):
         if not bucket:
-            bucket = self.client.get_bucket(self.account)
+            bucket = self.client.get_bucket(
+                self.account,
+                timeout=30
+            )
 
         blob = bucket.get_blob(self.container + '/')
 
@@ -712,7 +742,10 @@ class SwiftGCPDriver(BaseDriver):
     @cors_validation
     def post_object(self, req, bucket=None, obj=None):
         if not bucket:
-            bucket = self.client.get_bucket(self.account)
+            bucket = self.client.get_bucket(
+                self.account,
+                timeout=30
+            )
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
@@ -734,7 +767,10 @@ class SwiftGCPDriver(BaseDriver):
     @cors_validation
     def delete_object(self, req, bucket=None, obj=None):
         if not bucket:
-            bucket = self.client.get_bucket(self.account)
+            bucket = self.client.get_bucket(
+                self.account,
+                timeout=30
+            )
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
