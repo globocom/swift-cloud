@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 services:
   database:
@@ -11,8 +11,8 @@ services:
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: 1
     networks:
-        swift_cloud_net:
-            ipv4_address: 10.9.0.5
+      swift_cloud_net:
+        ipv4_address: 10.9.0.5
 
   keystone:
     container_name: keystone
@@ -26,8 +26,8 @@ services:
       - 35357:35357
       - 5000:5000
     networks:
-        swift_cloud_net:
-            ipv4_address: 10.9.0.6
+      swift_cloud_net:
+        ipv4_address: 10.9.0.6
 
   fake_swift:
     container_name: fake_swift
@@ -47,16 +47,16 @@ services:
     extra_hosts:
       localhost: 10.9.0.6
     networks:
-        swift_cloud_net:
-            ipv4_address: 10.9.0.7
+      swift_cloud_net:
+        ipv4_address: 10.9.0.7
 
 volumes:
   vol_database:
   vol_keystone:
 
 networks:
-    swift_cloud_net:
-        driver: bridge
-        ipam:
-            config:
-                - subnet: 10.9.0.0/16
+  swift_cloud_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.9.0.0/16

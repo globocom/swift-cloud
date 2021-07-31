@@ -8,9 +8,8 @@ help:
 
 clean: ## Project cleaning up for any extra files created during execution
 	@echo "Cleaning up"
-	@find . -name "*.pyc" -delete
-	@find . -name "*.~" -delete
-	@find . -name "__pycache__" -delete
+	@rm -rf build dist *.egg-info
+	@find . \( -name '*.pyc' -o  -name '__pycache__' -o -name '**/*.pyc' -o -name '*~' \) -delete
 
 setup: dependencies ## Install project dependencies and some git hooks
 	@pip install -r requirements_test.txt
