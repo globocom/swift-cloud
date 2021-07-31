@@ -70,7 +70,6 @@ class SwiftGCPDriver(BaseDriver):
         self.client = self._get_client()
 
         self.account = None
-        self.project_id = None
         self.container = None
         self.obj = None
 
@@ -94,7 +93,6 @@ class SwiftGCPDriver(BaseDriver):
 
         self.prefix = prefix[:-1] if prefix else ''
         self.account = account.lower() if account else None
-        self.project_id = self.account.replace('auth_', '')
         self.container = container
         self.obj = obj
 
@@ -177,15 +175,17 @@ class SwiftGCPDriver(BaseDriver):
             return None
 
     def head_account(self):
-        ok, data = self.tools.get_account_data(self.project_id)
+        account_bucket = self._get_or_create_bucket(self.account)
 
-        if not ok:
-            return self._error_response(data.get('error'))
+        if not account_bucket:
+            return self._error_response('Get Account Error.')
+
+        labels = account_bucket.labels
 
         headers = {
-            'X-Account-Container-Count': data.get('container_count', 0),
-            'X-Account-Object-Count': data.get('object_count', 0),
-            'X-Account-Bytes-Used': data.get('bytes_used', 0)
+            'X-Account-Container-Count': labels.get('container-count', 0),
+            'X-Account-Object-Count': labels.get('object-count', 0),
+            'X-Account-Bytes-Used': labels.get('bytes-used', 0)
         }
 
         account_meta = self.account_info.get('meta')
@@ -196,51 +196,37 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204, headers)
 
     def get_account(self):
-        # account_bucket = self._get_or_create_bucket(self.account)
+        account_bucket = self._get_or_create_bucket(self.account)
 
-        # if not account_bucket:
-        #     return self._error_response('Get Account Error.')
+        if not account_bucket:
+            return self._error_response('Get Account Error.')
 
-        ok, data = self.tools.get_account_data(
-            self.project_id, list_containers=True)
+        account_blobs, containers = [], []
 
-        if not ok:
-            return self._error_response(data.get('error'))
+        try:
+            account_blobs = list(account_bucket.list_blobs())
+            containers = filter(is_container, account_blobs)
+        except Exception as err:
+            log.error(err)
+            return self._error_response(err)
 
-        # account_blobs, containers, objects = [], [], []
+        container_list = []
+        for item in containers:
+            metadata = item.metadata or {}
+            container_list.append({
+                'count': metadata.get('object-count', 0),
+                'bytes': metadata.get('bytes-used', 0),
+                'name': item.name.replace('/', ''),
+                'last_modified': item.updated.isoformat()
+            })
 
-        # try:
-        #     account_blobs = list(account_bucket.list_blobs())
-        #     containers = filter(is_container, account_blobs)
-        #     objects = filter(lambda x: all_objects(x), account_blobs)
-        # except Exception as err:
-        #     log.error(err)
-        #     return self._error_response(err)
-
-        # container_list = []
-        # for item in containers:
-        #     folder_blobs = list(account_bucket.list_blobs(prefix=item.name))
-        #     container_list.append({
-        #         # all blobs except main folder (container)
-        #         'count': len(folder_blobs) - 1,
-        #         'bytes': blobs_size(folder_blobs),
-        #         'name': item.name.replace('/', ''),
-        #         'last_modified': item.updated.isoformat()
-        #     })
-
-        # headers = {
-        #     'X-Account-Container-Count': len(container_list),
-        #     'X-Account-Object-Count': len(objects),
-        #     'X-Account-Bytes-Used': blobs_size(account_blobs)
-        # }
+        labels = account_bucket.labels
 
         headers = {
-            'X-Account-Container-Count': data.get('container_count', 0),
-            'X-Account-Object-Count': data.get('object_count', 0),
-            'X-Account-Bytes-Used': data.get('bytes_used', 0)
+            'X-Account-Container-Count': labels.get('container-count', 0),
+            'X-Account-Object-Count': labels.get('object-count', 0),
+            'X-Account-Bytes-Used': labels.get('bytes-used', 0)
         }
-
-        container_list = data.get('containers', [])
 
         account_meta = self.account_info.get('meta')
         for key in account_meta:
@@ -299,24 +285,11 @@ class SwiftGCPDriver(BaseDriver):
             prefix = '/'.join([self.container, self.prefix])
             blob = bucket.get_blob(prefix)
             container_blobs = list(bucket.list_blobs(prefix=prefix))
-            level = len(prefix[:-1].split('/'))
-            objects = filter(lambda x: is_object(level, x), container_blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
 
-        # ok, data = self.tools.get_container_data(self.project_id, self.container)
-
-        # if not ok:
-        #     return self._error_response(data.get('error'))
-
-        headers = {
-            'X-Container-Object-Count': len(objects),
-            # 'X-Container-Object-Count': data.get('object_count', 0),
-            'X-Container-Bytes-Used': blobs_size(objects)
-            # 'X-Container-Bytes-Used': data.get('bytes_used', 0)
-        }
-
+        headers = {}
         if blob and blob.metadata:
             for key, value in blob.metadata.items():
                 if key.lower() not in RESERVED_META:
@@ -354,11 +327,7 @@ class SwiftGCPDriver(BaseDriver):
                 'last_modified': item.updated.isoformat()
             })
 
-        headers = {
-            'X-Container-Object-Count': len(object_list),
-            'X-Container-Bytes-Used': blobs_size(objects)
-        }
-
+        headers = {}
         if blob and blob.metadata:
             for key, value in blob.metadata.items():
                 if key.lower() not in RESERVED_META:
@@ -375,6 +344,12 @@ class SwiftGCPDriver(BaseDriver):
 
     def _set_container_metadata(self, blob):
         metadata = blob.metadata or {}
+
+        if not metadata.get('object-count'):
+            metadata['object-count'] = 0
+
+        if not metadata.get('bytes-used'):
+            metadata['bytes-used'] = 0
 
         for item in self.req.headers.iteritems():
             key, value = item
@@ -449,7 +424,12 @@ class SwiftGCPDriver(BaseDriver):
         blob.metadata = metadata
         blob.patch()
 
-        self.tools.update_container_info(self.project_id, self.container, 0)
+        # updates account container count
+        labels = bucket.labels
+        container_count = int(labels.get('container-count', 0))
+        labels['container-count'] = container_count + 1
+        bucket.labels = labels
+        bucket.patch()
 
         return self._default_response('', 201)
 
@@ -493,10 +473,22 @@ class SwiftGCPDriver(BaseDriver):
             return self._default_response('', 404)
 
         prefix = self.container + '/'
-        blobs = list(bucket.list_blobs(prefix=prefix))
+        blob = bucket.get_blob(prefix)
+        if not blob:
+            return self._default_response('', 404)
 
-        for blob in blobs:
-            blob.delete()
+        blobs = list(bucket.list_blobs(prefix=prefix, max_results=3))
+        if len(blobs) > 1:
+            return self._default_response('', 409)
+
+        blob.delete()
+
+        # updates account container count
+        labels = bucket.labels
+        container_count = int(labels.get('container-count', 0))
+        labels['container-count'] = max(0, container_count - 1)
+        bucket.labels = labels
+        bucket.patch()
 
         return self._default_response('', 204)
 
@@ -705,6 +697,36 @@ class SwiftGCPDriver(BaseDriver):
 
         return True, blob
 
+    def _update_counters(self,
+                         account_bucket,
+                         container_blob,
+                         bytes_used,
+                         remove=False):
+        labels = account_bucket.labels or {}
+        metadata = container_blob.metadata or {}
+
+        account_obj_count = int(labels.get('object-count', 0))
+        account_bytes_used = int(labels.get('bytes-used', 0))
+        container_obj_count = int(metadata.get('object-count', 0))
+        container_bytes_used = int(metadata.get('bytes-used', 0))
+
+        if remove:
+            labels['object-count'] = max(0, account_obj_count - 1)
+            labels['bytes-used'] = max(0, account_bytes_used - bytes_used)
+            metadata['object-count'] = max(0, container_obj_count - 1)
+            metadata['bytes-used'] = max(0, container_bytes_used - bytes_used)
+        else:
+            labels['object-count'] = account_obj_count + 1
+            labels['bytes-used'] = account_bytes_used + bytes_used
+            metadata['object-count'] = container_obj_count + 1
+            metadata['bytes-used'] = container_bytes_used + bytes_used
+
+        account_bucket.labels = labels
+        container_blob.metadata = metadata
+
+        account_bucket.patch()
+        container_blob.patch()
+
     @cors_validation
     def put_object(self, req, bucket=None, obj=None):
         if not bucket:
@@ -713,9 +735,9 @@ class SwiftGCPDriver(BaseDriver):
                 timeout=30
             )
 
-        blob = bucket.get_blob(self.container + '/')
+        container_blob = bucket.get_blob(self.container + '/')
 
-        if not blob:
+        if not container_blob:
             return self._default_response('The resource could not be found', 404)
 
         obj_path = "{}/{}".format(self.container, self.obj)
@@ -752,8 +774,7 @@ class SwiftGCPDriver(BaseDriver):
         headers = self.get_object_headers(blob)
         headers['Content-Length'] = 0
 
-        self.tools.update_container_info(
-            self.project_id, self.container, len(obj_data))
+        self._update_counters(bucket, container_blob, len(obj_data))
 
         return self._default_response('', 201, headers)
 
@@ -790,6 +811,8 @@ class SwiftGCPDriver(BaseDriver):
                 timeout=30
             )
         obj_path = "{}/{}".format(self.container, self.obj)
+
+        container_blob = bucket.get_blob(self.container + '/')
         blob = bucket.get_blob(obj_path)
 
         if not blob or not blob.exists():
@@ -805,9 +828,8 @@ class SwiftGCPDriver(BaseDriver):
             if not result:
                 return self._error_response(msg)
 
-        self.tools.update_container_info(
-            self.project_id, self.container, blob.size, remove=True)
-
         blob.delete()
+
+        self._update_counters(bucket, container_blob, blob.size, remove=True)
 
         return self._default_response('', 204)
