@@ -48,7 +48,8 @@ def is_pseudofolder(level, blob):
 
 def all_objects(blob):
     chunks = blob.name.split('/')
-    return (len(chunks) == 2 and chunks[-1] != '') or (len(chunks) > 2 and 'application/directory' not in blob.content_type)
+    return ((len(chunks) == 2 and chunks[-1] != '')
+        or (len(chunks) > 2 and 'application/directory' not in blob.content_type))
 
 
 def blobs_size(blob_list):
@@ -91,7 +92,9 @@ class SwiftGCPDriver(BaseDriver):
 
         prefix = self.req.params.get('prefix')
 
-        self.prefix = prefix[:-1] if prefix else ''
+        # self.prefix = prefix[:-1] if prefix else ''
+        self.prefix = prefix if prefix else ''
+
         self.account = account.lower() if account else None
         self.container = container
         self.obj = obj
@@ -301,15 +304,35 @@ class SwiftGCPDriver(BaseDriver):
 
     @cors_validation
     def get_container(self, req, bucket=None, obj=None):
+        marker = self.req.params.get('marker')
+        end_marker = self.req.params.get('end_marker')
+        limit = self.req.params.get('limit')
+        delimiter = self.req.params.get('delimiter')
+        prefix = '/'.join([self.container, self.prefix])
+        params = {'prefix': prefix}
+
+        if delimiter:
+            params['delimiter'] = delimiter
+            params['include_trailing_delimiter'] = True
+
+        if marker:
+            params['start_offset'] = marker
+
+        if end_marker:
+            params['end_offset'] = end_marker
+
+        if limit:
+            params['max_results'] = int(limit) + 1  # includes the folder as "container"
+
         try:
             if not bucket:
-                bucket = self.client.get_bucket(
-                    self.account,
-                    timeout=30
-                )
-            prefix = '/'.join([self.container, self.prefix])
-            blob = bucket.get_blob(prefix)
-            blobs = list(bucket.list_blobs(prefix=prefix))
+                bucket = self.client.get_bucket(self.account, timeout=30)
+
+            blobs = list(bucket.list_blobs(**params))
+
+            if marker:
+                blobs = blobs[1:]  # start_offset is inclusive
+
             level = len(prefix[:-1].split('/'))
             pseudofolders = filter(lambda x: is_pseudofolder(level, x), blobs)
             objects = filter(lambda x: is_object(level, x), blobs)
@@ -328,6 +351,8 @@ class SwiftGCPDriver(BaseDriver):
             })
 
         headers = {}
+        blob = bucket.get_blob(prefix)
+
         if blob and blob.metadata:
             for key, value in blob.metadata.items():
                 if key.lower() not in RESERVED_META:
@@ -336,9 +361,6 @@ class SwiftGCPDriver(BaseDriver):
                     headers[key] = value
 
         status = 200
-        if self.req.params.get('marker'):  # TODO: pagination
-            container_list = []
-            status = 204
 
         return self._json_response(object_list, status, headers)
 
