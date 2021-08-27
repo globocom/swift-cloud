@@ -51,7 +51,8 @@ def is_pseudofolder(level, blob):
 
 def all_objects(blob):
     chunks = blob.name.split('/')
-    return (len(chunks) == 2 and chunks[-1] != '') or (len(chunks) > 2 and 'application/directory' not in blob.content_type)
+    return ((len(chunks) == 2 and chunks[-1] != '')
+        or (len(chunks) > 2 and 'application/directory' not in blob.content_type))
 
 
 def blobs_size(blob_list):
@@ -94,7 +95,9 @@ class SwiftGCPDriver(BaseDriver):
 
         prefix = self.req.params.get('prefix')
 
-        self.prefix = prefix[:-1] if prefix else ''
+        # self.prefix = prefix[:-1] if prefix else ''
+        self.prefix = prefix if prefix else ''
+
         self.account = account.lower() if account else None
         self.container = container
         self.obj = obj
