@@ -2,6 +2,7 @@ import logging
 
 from swift.common.swob import Request
 from swift.common.utils import split_path
+from swift.common.middleware.proxy_logging import ProxyLoggingMiddleware
 from swift.proxy.controllers.base import get_account_info
 
 from swift_cloud.drivers.gcp import SwiftGCPDriver
@@ -26,6 +27,9 @@ class SwiftCloudMiddleware(object):
         driver = SwiftGCPDriver(req, account_info, self.app, self.conf)
         http_verbs = ['HEAD', 'GET', 'POST', 'DELETE']
         resp = driver.response()
+
+        if isinstance(resp, ProxyLoggingMiddleware):
+            return self.app
 
         if req.method in http_verbs and resp.status_int == 404:
             return self.app

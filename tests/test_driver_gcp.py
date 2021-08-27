@@ -63,10 +63,11 @@ class FakeBlob:
 
 
 class FakeBucket:
-    def __init__(self, blob=FakeBlob(), blobs=[], exists=True):
+    def __init__(self, blob=FakeBlob(), blobs=[], labels={}, exists=True):
         self._exists = exists
         self.blob = blob
         self.blobs = blobs
+        self.labels = labels
 
     def exists(self):
         return self._exists
