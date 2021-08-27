@@ -311,7 +311,9 @@ class SwiftGCPDriver(BaseDriver):
         end_marker = self.req.params.get('end_marker')
         limit = self.req.params.get('limit')
         delimiter = self.req.params.get('delimiter')
-        prefix = '/'.join([self.container, self.prefix + '/' if self.prefix else ''])
+        prefix = self.container + '/'
+        if self.prefix:
+            prefix = '/'.join([self.container, self.prefix + ('' if self.prefix[-1] == '/' else '/')])
         params = {'prefix': prefix}
 
         if delimiter:
