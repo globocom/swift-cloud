@@ -307,10 +307,10 @@ class SwiftGCPDriver(BaseDriver):
 
     @cors_validation
     def get_container(self, req, bucket=None, obj=None):
-        marker = self.req.params.get('marker')
-        end_marker = self.req.params.get('end_marker')
-        limit = self.req.params.get('limit')
-        delimiter = self.req.params.get('delimiter')
+        marker = req.params.get('marker')
+        end_marker = req.params.get('end_marker')
+        limit = req.params.get('limit')
+        delimiter = req.params.get('delimiter')
         prefix = self.container + '/'
         if self.prefix:
             prefix = '/'.join([self.container, self.prefix + ('' if self.prefix[-1] == '/' else '/')])
@@ -371,6 +371,8 @@ class SwiftGCPDriver(BaseDriver):
                     headers[key] = value
 
         status = 200
+        if len(object_list) == 0:
+            status = 204
 
         return self._json_response(object_list, status, headers)
 
