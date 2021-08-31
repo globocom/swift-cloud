@@ -353,13 +353,28 @@ class SwiftGCPDriver(BaseDriver):
             items = items + [blob]
 
         for item in items:
-            object_list.append({
-                'name': item.name.replace(self.container + '/', ''),
-                'bytes': item.size,
-                'hash': item.md5_hash,
-                'content_type': item.content_type,
-                'last_modified': item.updated.isoformat()
-            })
+            if item.content_type == 'application/directory':
+                has_object = len(list(filter(lambda x: item.name in x.name, objects)))
+                if item.name != prefix and has_object == 0:
+                    object_list.append({
+                        'subdir': '/'.join(item.name.split('/')[1:])
+                    })
+                else:
+                    object_list.append({
+                        'name': item.name.replace(self.container + '/', ''),
+                        'bytes': item.size,
+                        'hash': item.md5_hash,
+                        'content_type': item.content_type,
+                        'last_modified': item.updated.isoformat()
+                    })
+            else:
+                object_list.append({
+                    'name': item.name.replace(self.container + '/', ''),
+                    'bytes': item.size,
+                    'hash': item.md5_hash,
+                    'content_type': item.content_type,
+                    'last_modified': item.updated.isoformat()
+                })
 
         headers = {}
 
