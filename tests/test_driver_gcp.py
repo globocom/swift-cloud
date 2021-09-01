@@ -251,7 +251,7 @@ class SwiftGCPDriverTestCase(TestCase):
         fake_bucket = FakeBucket(blobs=[fake_blob])
         self.mock_client.return_value = FakeClient(bucket=fake_bucket)
         res = self._driver('/v1/account/container', 'GET').response()
-        self.assertEquals(res.status_int, 204)
+        self.assertEquals(res.status_int, 200)
 
     def test_get_container_with_error(self):
         self.mock_client.return_value = FakeClient(error=Exception())

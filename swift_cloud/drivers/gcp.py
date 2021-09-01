@@ -38,15 +38,7 @@ def is_container(blob):
 
 def is_object(level, blob):
     chunks = blob.name.split('/')
-    return len(chunks) >= 2 and chunks[-1] != '' and len(chunks) - 1 == level
-
-
-def is_pseudofolder(level, blob):
-    chunks = blob.name.split('/')
-    level_blob = len(chunks) - 1
-    if chunks[-1] == '' and len(chunks) > 2:
-        level_blob = len(chunks) - 2
-    return len(chunks) > 2 and chunks[-1] == '' and level_blob == level
+    return len(chunks) >= 2 and chunks[-1] != ''
 
 
 def all_objects(blob):
@@ -340,26 +332,21 @@ class SwiftGCPDriver(BaseDriver):
 
             blob = bucket.get_blob(prefix)
             level = len(blob.name.split('/')) - 1
-            pseudofolders = filter(lambda x: is_pseudofolder(level, x), blobs)
             objects = filter(lambda x: is_object(level, x), blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
 
         object_list = []
-        items = objects + pseudofolders
 
-        if level > 1:
-            items = items + [blob]
-
-        for item in items:
-            if item.content_type == 'application/directory':
+        for item in blobs:
+            if 'application/directory' in item.content_type:
                 has_object = len(list(filter(lambda x: item.name in x.name, objects)))
                 if item.name != prefix and has_object == 0:
                     object_list.append({
                         'subdir': '/'.join(item.name.split('/')[1:])
                     })
-                else:
+                elif level > 1:
                     object_list.append({
                         'name': item.name.replace(self.container + '/', ''),
                         'bytes': item.size,
