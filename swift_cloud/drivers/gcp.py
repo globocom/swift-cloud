@@ -241,7 +241,7 @@ class SwiftGCPDriver(BaseDriver):
     def delete_account(self):
         try:
             account_bucket = self.client.get_bucket(
-                bucket_name,
+                self.account,
                 timeout=30
             )
             account_bucket.delete()
