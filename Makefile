@@ -31,15 +31,14 @@ docker-clean: ## Remove any container, network, volume and image created by dock
 docker-stop: ## Stop docker-compose created containers
 	@docker-compose stop
 
-docker: docker-build ## Build and start Docker containers
+docker: docker-build ## Run docker-compose (Build and start Docker containers)
 	@docker-compose up
 
 docker-tests:
 	@docker exec -it fake_swift sh -c "cd /home/swift_cloud && make tests"
 
-run: ## Run docker-compose in background and attach to fake_swift container
+run: ## Run docker-compose in background 
 	@docker-compose up -d
-	@docker attach fake_swift
 
 restart: ## Restart fake-swift from docker-compose
 	@docker-compose restart fake_swift
