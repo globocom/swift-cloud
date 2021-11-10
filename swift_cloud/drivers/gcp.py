@@ -250,7 +250,7 @@ class SwiftGCPDriver(BaseDriver):
         except Conflict:
             return self._error_response('Account must be empty.')
 
-        return self._default_response('', 204, headers)
+        return self._default_response('', 204)
 
     def handle_container(self):
         aresp = self._is_authorized()
