@@ -138,6 +138,18 @@ class SwiftGCPDriver(BaseDriver):
             return self.req.environ['swift.authorize'](self.req)
         return self.app
 
+    def _base_options(self, allowed):
+        headers = {'Allow': ', '.join(allowed)}
+
+        # not a a CORS pre-flight request
+        if not self.req.headers.get('Origin', None):
+            return self._default_response('', 204, headers)
+
+        # CORS pre-flight headers
+        headers['Access-Control-Allow-Methods'] = ', '.join(allowed)
+
+        return self._default_response('', 204, headers)
+
     def handle_account(self):
         aresp = self._is_authorized()
         if aresp:
@@ -253,6 +265,9 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204)
 
     def handle_container(self):
+        if self.req.method == 'OPTIONS':
+            return self.options_container(self.req)
+
         aresp = self._is_authorized()
         if aresp:
             return aresp
@@ -271,6 +286,11 @@ class SwiftGCPDriver(BaseDriver):
 
         if self.req.method == 'DELETE':
             return self.delete_container(self.req)
+
+    @cors_validation
+    def options_container(self, req, bucket=None, obj=None):
+        allowed = ['OPTIONS', 'HEAD', 'GET', 'PUT', 'POST', 'DELETE']
+        return self._base_options(allowed)
 
     @cors_validation
     def head_container(self, req, bucket=None, obj=None):
@@ -529,6 +549,9 @@ class SwiftGCPDriver(BaseDriver):
         return self._default_response('', 204)
 
     def handle_object(self):
+        if self.req.method == 'OPTIONS':
+            return self.options_object(self.req)
+
         if self.req.method == 'HEAD':
             return self.head_object(self.req)
 
@@ -621,6 +644,11 @@ class SwiftGCPDriver(BaseDriver):
             updated = True
 
         return updated, blob
+
+    @cors_validation
+    def options_object(self, req, bucket=None, obj=None):
+        allowed = ['OPTIONS', 'HEAD', 'GET', 'PUT', 'POST', 'DELETE']
+        return self._base_options(allowed)
 
     @cors_validation
     def head_object(self, req, bucket=None, obj=None):

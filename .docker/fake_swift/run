@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-gunicorn -t 3600 -b 0.0.0.0:8080 wsgi --reload --log-level debug
+uwsgi --http 0.0.0.0:8080 --module wsgi:application --py-auto-reload=3

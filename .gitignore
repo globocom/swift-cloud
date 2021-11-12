@@ -13,6 +13,7 @@
 .pydevproject
 .pytest_cache/
 .settings/
+.venv/
 .vscode/
 __pycache__/
 build/

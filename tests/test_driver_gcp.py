@@ -1,8 +1,7 @@
 from datetime import datetime, date
 from mock import patch, Mock
 from unittest import TestCase
-from swift.common.swob import Request
-from google.cloud.exceptions import NotFound
+from swift.common.swob import Response, Request
 from swift_cloud.drivers.gcp import SwiftGCPDriver
 
 
