@@ -1,6 +1,7 @@
 Flask==1.1.2
+gunicorn==19.10.0
 ipdb==0.13.7
 keystonemiddleware==8.0.0
 PasteDeploy==2.1.1
 swift==2.22.0
-uwsgi==2.0.20
+# uwsgi==2.0.20
