@@ -765,6 +765,8 @@ class SwiftGCPDriver(BaseDriver):
                          account_bucket,
                          container_blob,
                          bytes_used,
+                         has_obj,
+                         obj_size,
                          remove=False):
         labels = account_bucket.labels or {}
         metadata = container_blob.metadata or {}
@@ -773,13 +775,6 @@ class SwiftGCPDriver(BaseDriver):
         account_bytes_used = int(labels.get('bytes-used', 0))
         container_obj_count = int(metadata.get('object-count', 0))
         container_bytes_used = int(metadata.get('bytes-used', 0))
-
-        obj_path = "{}/{}".format(self.container, self.obj)
-        blob = account_bucket.get_blob(obj_path)
-        has_obj = True
-
-        if not blob or not blob.exists():
-            has_obj = False
 
         if remove:
             count = 1 if has_obj else 0
@@ -794,7 +789,7 @@ class SwiftGCPDriver(BaseDriver):
             used = bytes_used
 
             if has_obj:
-                used = bytes_used - blob.size
+                used = bytes_used - obj_size
 
             labels['object-count'] = account_obj_count + count
             labels['bytes-used'] = account_bytes_used + used
@@ -826,6 +821,14 @@ class SwiftGCPDriver(BaseDriver):
         delete_at = self.req.headers.get('x-delete-at')
         delete_after = self.req.headers.get('x-delete-after')
 
+        has_obj = False
+        obj_size = 0
+        has_blob = bucket.get_blob(obj_path)
+
+        if has_blob and has_blob.exists():
+            has_obj = True
+            obj_size = has_blob.size
+
         _, blob = self.update_object_headers(blob)
 
         if delete_at or delete_after:
@@ -854,7 +857,7 @@ class SwiftGCPDriver(BaseDriver):
         headers = self.get_object_headers(blob)
         headers['Content-Length'] = 0
 
-        self._update_counters(bucket, container_blob, len(obj_data))
+        self._update_counters(bucket, container_blob, len(obj_data), has_obj, obj_size)
 
         return self._default_response('', 201, headers)
 
@@ -898,6 +901,9 @@ class SwiftGCPDriver(BaseDriver):
         if not blob or not blob.exists():
             return self._default_response('', 404)
 
+        has_obj = True
+        obj_size = blob.size
+
         headers = self.get_object_headers(blob)
         delete_at = headers.get('x-delete-at')
 
@@ -910,6 +916,6 @@ class SwiftGCPDriver(BaseDriver):
 
         blob.delete()
 
-        self._update_counters(bucket, container_blob, blob.size, remove=True)
+        self._update_counters(bucket, container_blob, blob.size, has_obj, obj_size, remove=True)
 
         return self._default_response('', 204)
