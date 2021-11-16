@@ -177,7 +177,7 @@ class SwiftGCPDriver(BaseDriver):
         except NotFound:
             bucket = self.client.create_bucket(
                 bucket_name, location=BUCKET_LOCATION)
-            bucket.iam_configuration.uniform_bucket_level_access_enabled = False
+            # bucket.iam_configuration.uniform_bucket_level_access_enabled = False
             bucket.patch()
             return bucket
         except Exception as err:
@@ -465,7 +465,7 @@ class SwiftGCPDriver(BaseDriver):
         except NotFound:
             bucket = self.client.create_bucket(
                 self.account, location=BUCKET_LOCATION)
-            bucket.iam_configuration.uniform_bucket_level_access_enabled = False
+            # bucket.iam_configuration.uniform_bucket_level_access_enabled = False
             bucket.patch()
         except Exception as err:
             log.error(err)
@@ -774,16 +774,32 @@ class SwiftGCPDriver(BaseDriver):
         container_obj_count = int(metadata.get('object-count', 0))
         container_bytes_used = int(metadata.get('bytes-used', 0))
 
+        obj_path = "{}/{}".format(self.container, self.obj)
+        blob = account_bucket.get_blob(obj_path)
+        has_obj = True
+
+        if not blob or not blob.exists():
+            has_obj = False
+
         if remove:
-            labels['object-count'] = max(0, account_obj_count - 1)
-            labels['bytes-used'] = max(0, account_bytes_used - bytes_used)
-            metadata['object-count'] = max(0, container_obj_count - 1)
-            metadata['bytes-used'] = max(0, container_bytes_used - bytes_used)
+            count = 1 if has_obj else 0
+            used = bytes_used if has_obj else 0
+
+            labels['object-count'] = max(0, account_obj_count - count)
+            labels['bytes-used'] = max(0, account_bytes_used - used)
+            metadata['object-count'] = max(0, container_obj_count - count)
+            metadata['bytes-used'] = max(0, container_bytes_used - used)
         else:
-            labels['object-count'] = account_obj_count + 1
-            labels['bytes-used'] = account_bytes_used + bytes_used
-            metadata['object-count'] = container_obj_count + 1
-            metadata['bytes-used'] = container_bytes_used + bytes_used
+            count = 1 if not has_obj else 0
+            used = bytes_used
+
+            if has_obj:
+                used = bytes_used - blob.size
+
+            labels['object-count'] = account_obj_count + count
+            labels['bytes-used'] = account_bytes_used + used
+            metadata['object-count'] = container_obj_count + count
+            metadata['bytes-used'] = container_bytes_used + used
 
         account_bucket.labels = labels
         container_blob.metadata = metadata
