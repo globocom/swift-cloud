@@ -672,6 +672,7 @@ class SwiftGCPDriver(BaseDriver):
                 return self._default_response('', 401)
 
         headers = self.get_object_headers(blob)
+        headers['Content-Length'] = 0
 
         return self._default_response('', 204, headers)
 

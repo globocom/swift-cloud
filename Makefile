@@ -37,6 +37,9 @@ docker: docker-build ## Run docker-compose (Build and start Docker containers)
 docker-tests:
 	@docker exec -it fake_swift sh -c "cd /home/swift_cloud && make tests"
 
+docker-attach:
+	@docker attach fake_swift
+
 run: ## Run docker-compose in background 
 	@docker-compose up -d
 
