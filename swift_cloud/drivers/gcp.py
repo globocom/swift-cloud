@@ -36,7 +36,7 @@ def is_container(blob):
     return len(chunks) == 2 and chunks[-1] == ''
 
 
-def is_object(level, blob):
+def is_object(blob):
     chunks = blob.name.split('/')
     return len(chunks) >= 2 and chunks[-1] != ''
 
@@ -122,9 +122,14 @@ class SwiftGCPDriver(BaseDriver):
     def _json_response(self, body, status, headers={}):
         self.headers.update(headers)
         self.headers['Content-Type'] = 'application/json; charset=utf-8'
-        return Response(body=json.dumps(body), status=status,
-                        headers=HeaderKeyDict(**self.headers),
-                        request=self.req)
+        if not body:
+            return Response(status=status,
+                            headers=HeaderKeyDict(**self.headers),
+                            request=self.req)
+        else:
+            return Response(body=json.dumps(body), status=status,
+                            headers=HeaderKeyDict(**self.headers),
+                            request=self.req)
 
     def _error_response(self, error, status=500):
         self.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -327,6 +332,7 @@ class SwiftGCPDriver(BaseDriver):
         if self.prefix:
             prefix = '/'.join([self.container, self.prefix + ('' if self.prefix[-1] == '/' else '/')])
         params = {'prefix': prefix}
+        level = 0
 
         if delimiter:
             params['delimiter'] = delimiter
@@ -351,8 +357,11 @@ class SwiftGCPDriver(BaseDriver):
                 blobs = blobs[1:]  # start_offset is inclusive
 
             blob = bucket.get_blob(prefix)
-            level = len(blob.name.split('/')) - 1
-            objects = filter(lambda x: is_object(level, x), blobs)
+
+            if blob:
+                level = len(blob.name.split('/')) - 1
+
+            objects = filter(lambda x: is_object(x), blobs)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -394,6 +403,8 @@ class SwiftGCPDriver(BaseDriver):
 
         status = 200
         if len(object_list) == 0:
+            headers['Content-Length'] = 0
+            object_list = None
             status = 204
 
         return self._json_response(object_list, status, headers)
