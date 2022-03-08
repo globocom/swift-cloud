@@ -31,7 +31,9 @@ class SwiftCloudMiddleware(object):
         if isinstance(resp, ProxyLoggingMiddleware):
             return self.app
 
-        if req.method in http_verbs and resp.status_int == 404:
+        index = resp.request.url.find('/.trash-')
+
+        if req.method in http_verbs and resp.status_int == 404 and index == -1:
             return self.app
 
         return resp
