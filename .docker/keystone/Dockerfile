@@ -8,7 +8,7 @@ RUN set -x \
     && apt-get -y clean all \
     %% pip install --upgrade pip setuptools pytz
 
-RUN curl -fSL https://tarballs.openstack.org/keystone/keystone-${VERSION}.tar.gz -o keystone-${VERSION}.tar.gz \
+RUN curl -fSLk https://tarballs.openstack.org/keystone/keystone-${VERSION}.tar.gz -o keystone-${VERSION}.tar.gz \
     && tar xvf keystone-${VERSION}.tar.gz \
     && cd keystone-${VERSION} \
     && pip install -r requirements.txt \
