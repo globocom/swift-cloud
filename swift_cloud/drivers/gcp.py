@@ -236,9 +236,10 @@ class SwiftGCPDriver(BaseDriver):
             })
 
         labels = account_bucket.labels
+        container_count = labels.get('container-count', 0)
 
         headers = {
-            'X-Account-Container-Count': labels.get('container-count', 0),
+            'X-Account-Container-Count': container_count,
             'X-Account-Object-Count': labels.get('object-count', 0),
             'X-Account-Bytes-Used': labels.get('bytes-used', 0)
         }
@@ -249,8 +250,8 @@ class SwiftGCPDriver(BaseDriver):
             headers[new_key] = account_meta[key]
 
         status = 200
-        if self.req.params.get('marker'):  # TODO: pagination
-            container_list = []
+        if self.req.params.get('marker') or container_count == 0:  # TODO: pagination
+            container_list = None
             status = 204
 
         return self._json_response(container_list, status, headers)
