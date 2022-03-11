@@ -865,6 +865,32 @@ class SwiftGCPDriver(BaseDriver):
                 break
             obj_data += chunk
 
+        objs =  self.obj.split('/')
+        path = self.container
+
+        is_folder = len(obj_data) == 0
+
+        if not is_folder:
+            objs = objs[:-1]
+
+        for obj in objs:
+            if not obj:
+                continue
+            path += '/' + obj
+            folder = bucket.blob(path + '/')
+            folder.upload_from_string('',
+                content_type='application/directory',
+                num_retries=3,
+                timeout=30
+            )
+
+        if is_folder:
+            headers = {
+                'Content-Type': 'application/directory',
+                'Content-Length': 0
+            }
+            return self._default_response('', 201, headers)
+
         blob.upload_from_string(obj_data, content_type=content_type)
 
         headers = self.get_object_headers(blob)

@@ -31,6 +31,11 @@ class SwiftCloudMiddleware(object):
         if isinstance(resp, ProxyLoggingMiddleware):
             return self.app
 
+        cloud_migration = account_info['meta'].get('cloud-migration')
+
+        if cloud_migration:
+            return resp
+
         index = resp.request.url.find('/.trash-')
 
         if req.method in http_verbs and resp.status_int == 404 and index == -1:
