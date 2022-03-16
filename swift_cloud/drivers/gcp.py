@@ -3,7 +3,6 @@ import json
 import pytz
 import logging
 import datetime
-from uuid import uuid4
 
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
@@ -74,7 +73,6 @@ class SwiftGCPDriver(BaseDriver):
         self.headers = {
             'Content-Type': 'text/html; charset=utf-8',
             'X-Timestamp': Timestamp.now().normal,
-            'X-Trans-Id': str(uuid4()),
             'Accept-Ranges': 'bytes'
         }
 
@@ -167,8 +165,7 @@ class SwiftGCPDriver(BaseDriver):
             return self.get_account()
 
         if self.req.method in ['POST']:
-            """POST requests for Account will be forwarded"""
-            return self.app
+            return self.post_account()
 
         if self.req.method == 'DELETE':
             return self.delete_account()
@@ -203,10 +200,10 @@ class SwiftGCPDriver(BaseDriver):
             'X-Account-Bytes-Used': labels.get('bytes-used', 0)
         }
 
-        account_meta = self.account_info.get('meta')
-        for key in account_meta:
-            new_key = 'X-Account-Meta-{}'.format(key)
-            headers[new_key] = account_meta[key]
+        for key in labels.keys():
+            if key.find('account-meta-') >= 0:
+                new_key = 'X-{}'.format(key)
+                headers[new_key] = labels[key]
 
         return self._default_response('', 204, headers)
 
@@ -244,10 +241,10 @@ class SwiftGCPDriver(BaseDriver):
             'X-Account-Bytes-Used': labels.get('bytes-used', 0)
         }
 
-        account_meta = self.account_info.get('meta')
-        for key in account_meta:
-            new_key = 'X-Account-Meta-{}'.format(key)
-            headers[new_key] = account_meta[key]
+        for key in labels.keys():
+            if key.find('account-meta-') >= 0:
+                new_key = 'X-{}'.format(key)
+                headers[new_key] = labels[key]
 
         status = 200
         if self.req.params.get('marker') or container_count == 0:  # TODO: pagination
@@ -255,6 +252,43 @@ class SwiftGCPDriver(BaseDriver):
             status = 204
 
         return self._json_response(container_list, status, headers)
+
+    def post_account(self):
+        account_bucket = self._get_or_create_bucket(self.account)
+
+        if not account_bucket:
+            return self._error_response('Get Account Error.')
+
+        labels = account_bucket.labels
+
+        for item in self.req.headers.iteritems():
+            key, value = item
+            key = key.lower()
+            prefix = key.split('x-account-meta-')
+
+            if len(prefix) > 1:
+                meta = 'account-meta-{}'.format(prefix[1].lower())
+
+                if len(value.strip()) == 0:
+                    if meta in list(labels.keys()):
+                        del labels[meta]
+                else:
+                    labels[meta] = value.encode('utf-8')
+                continue
+
+            prefix = key.split('x-remove-account-meta-')
+
+            if len(prefix) > 1:
+                meta = 'account-meta-{}'.format(prefix[1].lower())
+
+                if meta in list(labels.keys()):
+                    del labels[meta]
+                continue
+
+        account_bucket.labels = labels
+        account_bucket.patch()
+
+        return self._default_response('', 204)
 
     def delete_account(self):
         try:
