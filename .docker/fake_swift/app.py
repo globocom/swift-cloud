@@ -9,9 +9,19 @@ class App(object):
 
     map = routes.Mapper()
     map.connect('info', '/info', method='info', conditions=dict(method=['GET']))
-    map.connect('post_account', '/v1/{account}', method='post_account', conditions=dict(method=['POST']))
+
+    # account
+    map.connect('head_account', '/v1/{account}', method='head_account', conditions=dict(method=['HEAD']))
     map.connect('get_account', '/v1/{account}', method='get_account', conditions=dict(method=['GET']))
+    map.connect('post_account', '/v1/{account}', method='post_account', conditions=dict(method=['POST']))
+    map.connect('delete_account', '/v1/{account}', method='delete_account', conditions=dict(method=['DELETE']))
+
+    # container
     map.connect('get_container', '/v1/{account}/{container}', method='get_container', conditions=dict(method=['GET']))
+    map.connect('put_container', '/v1/{account}/{container}', method='put_container', conditions=dict(method=['PUT']))
+    map.connect('delete_container', '/v1/{account}/{container}', method='delete_container', conditions=dict(method=['DELETE']))
+
+    # object
     map.connect('get_object', '/v1/{account}/{container}/{obj}', method='get_object', conditions=dict(method=['GET']))
 
     @webob.dec.wsgify
@@ -30,6 +40,21 @@ class App(object):
     def info(self, req):
         body = json.dumps({'fake_swift': {'version': '0.0.1'}})
         return webob.Response(body=body, content_type='application/json')
+
+    def head_account(self, req, account=None):
+        resp = webob.Response(body='')
+        resp.status = 204
+        resp.headers.update({
+            'Content-Length': '0',
+            'X-Account-Bytes-Used': '0',
+            'X-Account-Container-Count': '0',
+            'X-Account-Object-Count': '0',
+            'Accept-Ranges': 'bytes',
+            'X-Timestamp': '1616116845',
+            'X-Account-Meta-Cloud': 'gcp',
+            'X-Account-Meta-Temp-Url-Key': 'secret'
+        })
+        return resp
 
     def get_account(self, req, account=None):
         resp = webob.Response(body=json.dumps([]), content_type='application/json')
@@ -53,11 +78,41 @@ class App(object):
         })
         return resp
 
+    def delete_account(self, req, account=None):
+        resp = webob.Response(body='')
+        resp.status = 204
+        resp.headers.update({
+            'Content-Type': 'text/html; charset=utf-8',
+            'Accept-Ranges': 'bytes',
+            'X-Timestamp': '1616116845'
+        })
+        return resp
+
     def get_container(self, req, account=None, container=None):
         resp = webob.Response(body=json.dumps([]), content_type='application/json')
         resp.headers.update({
             'X-Container-Bytes-Used': '0',
             'X-Container-Object-Count': '0',
+            'Accept-Ranges': 'bytes',
+            'X-Timestamp': '1616116845'
+        })
+        return resp
+
+    def put_container(self, req, account=None, container=None):
+        resp = webob.Response(body='')
+        resp.status = 201
+        resp.headers.update({
+            'Content-Type': 'text/html; charset=utf-8',
+            'Accept-Ranges': 'bytes',
+            'X-Timestamp': '1616116845'
+        })
+        return resp
+
+    def delete_container(self, req, account=None, container=None):
+        resp = webob.Response(body='', content_type='application/json')
+        resp.status = 204
+        resp.headers.update({
+            'Content-Type': 'text/html; charset=utf-8',
             'Accept-Ranges': 'bytes',
             'X-Timestamp': '1616116845'
         })
