@@ -3,7 +3,9 @@ import logging
 from swift.common.swob import Request
 from swift.common.utils import split_path
 from swift.common.middleware.proxy_logging import ProxyLoggingMiddleware
-from swift.proxy.controllers.base import get_account_info
+
+from google.oauth2.service_account import Credentials
+from google.cloud import storage
 
 from swift_cloud.drivers.gcp import SwiftGCPDriver
 
@@ -23,15 +25,18 @@ class SwiftCloudMiddleware(object):
         self.providers = conf.get('cloud_providers').split()
         self.x_cloud_bypass = conf.get('x_cloud_bypass')
 
-    def gcp_handler(self, req, account_info):
-        driver = SwiftGCPDriver(req, account_info, self.app, self.conf)
+        credentials = Credentials.from_service_account_file('/etc/swift/gcp_credentials.json')
+        self.client = storage.Client(credentials=credentials)
+
+    def gcp_handler(self, req, labels):
+        driver = SwiftGCPDriver(req, self.app, self.conf)
         http_verbs = ['HEAD', 'GET', 'POST', 'DELETE']
         resp = driver.response()
 
         if isinstance(resp, ProxyLoggingMiddleware):
             return self.app
 
-        cloud_migration = account_info['meta'].get('cloud-migration')
+        cloud_migration = labels.get('account-meta-cloud-migration')
 
         if cloud_migration:
             return resp
@@ -50,19 +55,30 @@ class SwiftCloudMiddleware(object):
         except ValueError as err:
             return self.app(environ, start_response)
 
-        account_info = get_account_info(environ, self.app)
-        cloud_name = account_info['meta'].get('cloud')
+        cloud_name = ''
         x_cloud_bypass = environ.get('HTTP_X_CLOUD_BYPASS')
+        new_cloud_name = environ.get('HTTP_X_ACCOUNT_META_CLOUD')
+
+        path_info = environ.get('PATH_INFO')
+        project = path_info.split('/')[2]
+
+        try:
+            bucket = self.client.get_bucket(project.lower(), timeout=30)
+            labels = bucket.labels
+            cloud_name = labels.get('account-meta-cloud')
+        except Exception:
+            pass
 
         if x_cloud_bypass == self.x_cloud_bypass:
             return self.app(environ, start_response)
 
-        if cloud_name and cloud_name in self.providers:
+        if (new_cloud_name and new_cloud_name in self.providers) or
+            (cloud_name and cloud_name in self.providers):
             req = Request(environ)
             handler = self.app
 
             if cloud_name == 'gcp':
-                handler = self.gcp_handler(req, account_info)
+                handler = self.gcp_handler(req, labels)
 
             return handler(environ, start_response)
 

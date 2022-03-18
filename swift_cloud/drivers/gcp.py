@@ -55,9 +55,8 @@ def blobs_size(blob_list):
 
 class SwiftGCPDriver(BaseDriver):
 
-    def __init__(self, req, account_info, app, conf):
+    def __init__(self, req, app, conf):
         self.req = req
-        self.account_info = account_info
         self.app = app
         self.conf = conf
 
