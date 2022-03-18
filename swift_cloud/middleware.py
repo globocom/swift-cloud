@@ -72,7 +72,7 @@ class SwiftCloudMiddleware(object):
         if x_cloud_bypass == self.x_cloud_bypass:
             return self.app(environ, start_response)
 
-        if (new_cloud_name and new_cloud_name in self.providers) or
+        if (new_cloud_name and new_cloud_name in self.providers) or \
             (cloud_name and cloud_name in self.providers):
             req = Request(environ)
             handler = self.app
