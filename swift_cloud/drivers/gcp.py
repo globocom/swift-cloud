@@ -213,11 +213,28 @@ class SwiftGCPDriver(BaseDriver):
         if not account_bucket:
             return self._error_response('Get Account Error.')
 
-        account_blobs, containers = [], []
+        marker = self.req.params.get('marker')
+        end_marker = self.req.params.get('end_marker')
+        limit = self.req.params.get('limit')
+        params = {}
+
+        if marker:
+            params['start_offset'] = marker
+
+        if end_marker:
+            params['end_offset'] = end_marker
+
+        containers = []
 
         try:
-            account_blobs = list(account_bucket.list_blobs())
-            containers = filter(is_container, account_blobs)
+            account_blobs = account_bucket.list_blobs(**params)
+            for index, blob in enumerate(account_blobs):
+                if marker and index == 0:  # start_offset is inclusive
+                    continue
+                if is_container(blob):
+                    containers.append(blob)
+                if limit and (len(containers) >= int(limit)):
+                    break
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -247,7 +264,8 @@ class SwiftGCPDriver(BaseDriver):
                 headers[new_key] = labels[key]
 
         status = 200
-        if self.req.params.get('marker') or container_count == 0:  # TODO: pagination
+        if len(container_list) == 0:
+            headers['Content-Length'] = 0
             container_list = None
             status = 204
 
