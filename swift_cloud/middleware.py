@@ -25,7 +25,8 @@ class SwiftCloudMiddleware(object):
         self.providers = conf.get('cloud_providers').split()
         self.x_cloud_bypass = conf.get('x_cloud_bypass')
 
-        credentials = Credentials.from_service_account_file('/etc/swift/gcp_credentials.json')
+        credentials_path = conf.get('gcp_credentials')
+        credentials = Credentials.from_service_account_file(credentials_path)
         self.client = storage.Client(credentials=credentials)
 
     def gcp_handler(self, req, labels):
