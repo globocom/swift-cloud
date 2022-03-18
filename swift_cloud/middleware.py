@@ -62,6 +62,7 @@ class SwiftCloudMiddleware(object):
 
         path_info = environ.get('PATH_INFO')
         project = path_info.split('/')[2]
+        labels = {}
 
         try:
             bucket = self.client.get_bucket(project.lower(), timeout=30)
@@ -78,7 +79,7 @@ class SwiftCloudMiddleware(object):
             req = Request(environ)
             handler = self.app
 
-            if cloud_name == 'gcp':
+            if cloud_name == 'gcp' or new_cloud_name == 'gcp':
                 handler = self.gcp_handler(req, labels)
 
             return handler(environ, start_response)

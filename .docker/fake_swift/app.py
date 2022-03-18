@@ -1,4 +1,4 @@
-import json
+# import json
 import routes
 import webob
 import webob.dec
@@ -51,7 +51,6 @@ class App(object):
             'X-Account-Object-Count': '0',
             'Accept-Ranges': 'bytes',
             'X-Timestamp': '1616116845',
-            'X-Account-Meta-Cloud': 'gcp',
             'X-Account-Meta-Temp-Url-Key': 'secret'
         })
         return resp
