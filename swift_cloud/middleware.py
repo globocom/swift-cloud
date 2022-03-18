@@ -41,7 +41,7 @@ class SwiftCloudMiddleware(object):
         if cloud_migration:
             return resp
 
-        index = resp.request.url.find('/.trash-')
+        index = req.url.find('/.trash-')
 
         if req.method in http_verbs and resp.status_int == 404 and index == -1:
             return self.app
