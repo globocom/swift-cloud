@@ -317,7 +317,7 @@ class SwiftGCPDriver(BaseDriver):
         except NotFound:
             return self._default_response('Account not found.', 404)
         except Conflict:
-            return self._error_response('Account must be empty.')
+            return self._error_response('Account must be empty.', 409)
 
         return self._default_response('', 204)
 
