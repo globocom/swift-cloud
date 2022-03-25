@@ -3,6 +3,7 @@ import json
 import pytz
 import logging
 import datetime
+import mimetypes
 
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
@@ -534,7 +535,11 @@ class SwiftGCPDriver(BaseDriver):
             log.error(err)
             return self._error_response(err)
 
-        blob = bucket.blob(self.container + '/')
+        blob = bucket.get_blob(self.container + '/')
+
+        if not blob:
+            blob = bucket.blob(self.container + '/')
+
         blob.upload_from_string(
             '', content_type='application/directory;charset=UTF-8')
 
@@ -637,7 +642,7 @@ class SwiftGCPDriver(BaseDriver):
     def get_object_headers(self, blob):
         headers = {
             'Content-Type': blob.content_type,
-            'Etag': blob.etag,
+            # 'Etag': blob.etag,
             'Last-Modified': datetime.datetime.strftime(
                 blob.updated,
                 '%a, %d %b %Y %H:%M:%S GMT'
@@ -735,9 +740,8 @@ class SwiftGCPDriver(BaseDriver):
                 return self._default_response('', 401)
 
         headers = self.get_object_headers(blob)
-        headers['Content-Length'] = 0
 
-        return self._default_response('', 204, headers)
+        return self._default_response('', 200, headers)
 
     @cors_validation
     def get_object(self, req, bucket=None, blob=None):
@@ -941,6 +945,9 @@ class SwiftGCPDriver(BaseDriver):
                 'Content-Length': 0
             }
             return self._default_response('', 201, headers)
+
+        if not content_type:
+            content_type = mimetypes.guess_type(req.path)[0]
 
         blob.upload_from_string(obj_data, content_type=content_type)
 
