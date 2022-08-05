@@ -384,6 +384,8 @@ class SwiftGCPDriver(BaseDriver):
         prefix = self.container + '/'
         if self.prefix:
             prefix = '/'.join([self.container, self.prefix + ('' if self.prefix[-1] == '/' else '/')])
+        if marker:
+            marker = '{}/{}'.format(self.container, marker)
         params = {'prefix': prefix}
         level = 0
 
