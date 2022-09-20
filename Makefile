@@ -47,3 +47,6 @@ restart: ## Restart fake-swift from docker-compose
 	@docker-compose restart fake_swift
 
 stop: docker-stop ## Same as docker-stop
+
+release: ## Upload package to pypi-local and ipypi-local
+	@python setup.py sdist upload -r ipypi-local

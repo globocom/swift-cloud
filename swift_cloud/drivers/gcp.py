@@ -1,4 +1,5 @@
 import io
+import os
 import json
 import pytz
 import logging
@@ -20,7 +21,7 @@ from swift_cloud.decorators import cors_validation
 
 log = logging.getLogger(__name__)
 
-BUCKET_LOCATION = 'SOUTHAMERICA-EAST1'
+BUCKET_LOCATION = os.environ.get('BUCKET_LOCATION', 'US-EAST1')
 RESERVED_META = [
     'x-delete-at',
     'x-delete-after',
