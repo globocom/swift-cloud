@@ -28,7 +28,8 @@ RESERVED_META = [
     'x-versions-location',
     'x-history-location',
     'x-undelete-enabled',
-    'x-container-sysmeta-undelete-enabled'
+    'x-container-sysmeta-undelete-enabled',
+    'content-encoding'
 ]
 
 
@@ -361,7 +362,6 @@ class SwiftGCPDriver(BaseDriver):
                 )
             prefix = '/'.join([self.container, self.prefix])
             blob = bucket.get_blob(prefix)
-            container_blobs = list(bucket.list_blobs(prefix=prefix))
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -655,9 +655,6 @@ class SwiftGCPDriver(BaseDriver):
         if blob.cache_control:
             headers['Cache-Control'] = blob.cache_control
 
-        if blob.content_encoding:
-            headers['Content-Encoding'] = blob.content_encoding
-
         if blob.content_disposition:
             headers['Content-Disposition'] = blob.content_disposition
 
@@ -679,11 +676,6 @@ class SwiftGCPDriver(BaseDriver):
         cache_control = self.req.headers.get('cache-control')
         if cache_control:
             blob.cache_control = cache_control
-            updated = True
-
-        content_encoding = self.req.headers.get('content-encoding')
-        if content_encoding:
-            blob.content_encoding = content_encoding
             updated = True
 
         content_disposition = self.req.headers.get('content-disposition')
@@ -953,6 +945,13 @@ class SwiftGCPDriver(BaseDriver):
             content_type = mimetypes.guess_type(req.path)[0]
 
         blob.upload_from_string(obj_data, content_type=content_type)
+
+        if blob.content_encoding:
+            metadata = blob.metadata or {}
+            metadata['Content-Encoding'] = blob.content_encoding
+            blob.content_encoding = None
+            blob.metadata = metadata
+            blob.patch()
 
         headers = self.get_object_headers(blob)
         headers['Content-Length'] = 0
