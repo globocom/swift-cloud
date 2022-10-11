@@ -159,9 +159,9 @@ class SwiftGCPDriver(BaseDriver):
             headers['Access-Control-Allow-Headers'] = ', '.join(allow_headers)
 
             if 'vary' in headers:
-                headers['vary'] += ', Access-Control-Request-Headers'
+                headers['vary'] += ', Accept-Encoding, Origin, Access-Control-Request-Headers'
             else:
-                headers['vary'] = 'Access-Control-Request-Headers'
+                headers['vary'] = 'Accept-Encoding, Origin, Access-Control-Request-Headers'
 
         return self._default_response('', 204, headers)
 
