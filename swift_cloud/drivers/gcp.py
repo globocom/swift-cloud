@@ -152,6 +152,16 @@ class SwiftGCPDriver(BaseDriver):
 
         # CORS pre-flight headers
         headers['Access-Control-Allow-Methods'] = ', '.join(allowed)
+        request_headers = self.req.headers.get('Access-Control-Request-Headers')
+
+        if request_headers:
+            allow_headers = set([v.strip() for v in request_headers.split(',') if v.strip()])
+            headers['Access-Control-Allow-Headers'] = ', '.join(allow_headers)
+
+            if 'vary' in headers:
+                headers['vary'] += ', Access-Control-Request-Headers'
+            else:
+                headers['vary'] = 'Access-Control-Request-Headers'
 
         return self._default_response('', 204, headers)
 
