@@ -33,11 +33,6 @@ RESERVED_META = [
 ]
 
 
-def is_container(blob):
-    chunks = blob.name.split('/')
-    return len(chunks) == 2 and chunks[-1] == ''
-
-
 def is_object(blob):
     chunks = blob.name.split('/')
     return len(chunks) >= 2 and chunks[-1] != ''
@@ -159,9 +154,9 @@ class SwiftGCPDriver(BaseDriver):
             headers['Access-Control-Allow-Headers'] = ', '.join(allow_headers)
 
             if 'vary' in headers:
-                headers['vary'] += ', Accept-Encoding, Origin, Access-Control-Request-Headers'
+                headers['vary'] += ', Access-Control-Request-Headers'
             else:
-                headers['vary'] = 'Accept-Encoding, Origin, Access-Control-Request-Headers'
+                headers['vary'] = 'Access-Control-Request-Headers'
 
         return self._default_response('', 204, headers)
 
@@ -228,7 +223,12 @@ class SwiftGCPDriver(BaseDriver):
         marker = self.req.params.get('marker')
         end_marker = self.req.params.get('end_marker')
         limit = self.req.params.get('limit')
-        params = {}
+
+        params = {
+            'prefix': '',
+            'delimiter': '/',
+            'include_trailing_delimiter': True
+        }
 
         if marker:
             params['start_offset'] = marker
@@ -243,8 +243,7 @@ class SwiftGCPDriver(BaseDriver):
             for index, blob in enumerate(account_blobs):
                 if marker and index == 0:  # start_offset is inclusive
                     continue
-                if is_container(blob):
-                    containers.append(blob)
+                containers.append(blob)
                 if limit and (len(containers) >= int(limit)):
                     break
         except Exception as err:
