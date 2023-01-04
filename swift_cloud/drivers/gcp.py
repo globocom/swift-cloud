@@ -799,6 +799,7 @@ class SwiftGCPDriver(BaseDriver):
         delete_after = self.req.headers.get('x-delete-after')
         remove_delete_at = self.req.headers.get('x-remove-delete-at')
         remove_delete_after = self.req.headers.get('x-remove-delete-after')
+        self.obj = urllib.unquote(self.obj)
         date = None
 
         if delete_at and delete_at != '':
