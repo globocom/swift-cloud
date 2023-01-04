@@ -1,7 +1,8 @@
 import logging
 
-from swift.common.swob import Request
+from swift.common.swob import Request, Response
 from swift.common.utils import split_path
+from swift.common.header_key_dict import HeaderKeyDict
 from swift.common.middleware.proxy_logging import ProxyLoggingMiddleware
 
 from google.oauth2.service_account import Credentials
@@ -49,6 +50,13 @@ class SwiftCloudMiddleware(object):
 
         return resp
 
+    def default_response(self, environ, status, headers={}):
+        req = Request(environ)
+        return Response(body='',
+            status=status,
+            headers=HeaderKeyDict(**headers),
+            request=req)
+
     def __call__(self, environ, start_response):
         try:
             (version, account, container, obj) = \
@@ -84,7 +92,8 @@ class SwiftCloudMiddleware(object):
 
             return handler(environ, start_response)
 
-        return self.app(environ, start_response)
+        handler = self.default_response(environ, 404)
+        return handler(environ, start_response)
 
 
 def filter_factory(global_conf, **local_conf):
