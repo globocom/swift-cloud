@@ -5,6 +5,8 @@ import pytz
 import logging
 import datetime
 import mimetypes
+import urllib
+import time
 
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
@@ -14,6 +16,7 @@ from swift.common.exceptions import ChunkReadError
 from google.cloud import storage
 from google.cloud.exceptions import NotFound, Conflict
 from google.oauth2.service_account import Credentials
+from google.api_core.retry import Retry
 
 from swift_cloud.drivers.base import BaseDriver
 from swift_cloud.tools import SwiftCloudTools
@@ -187,7 +190,8 @@ class SwiftGCPDriver(BaseDriver):
             bucket = self.client.create_bucket(
                 bucket_name, location=BUCKET_LOCATION)
             # bucket.iam_configuration.uniform_bucket_level_access_enabled = False
-            bucket.patch()
+            deadline = Retry(deadline=60)
+            bucket.patch(timeout=10, retry=deadline)
             return bucket
         except Exception as err:
             log.error(err)
@@ -315,7 +319,8 @@ class SwiftGCPDriver(BaseDriver):
                 continue
 
         account_bucket.labels = labels
-        account_bucket.patch()
+        deadline = Retry(deadline=60)
+        account_bucket.patch(timeout=10, retry=deadline)
 
         return self._default_response('', 204)
 
@@ -542,7 +547,8 @@ class SwiftGCPDriver(BaseDriver):
             bucket = self.client.create_bucket(
                 self.account, location=BUCKET_LOCATION)
             # bucket.iam_configuration.uniform_bucket_level_access_enabled = False
-            bucket.patch()
+            deadline = Retry(deadline=60)
+            bucket.patch(timeout=10, retry=deadline)
         except Exception as err:
             log.error(err)
             return self._error_response(err)
@@ -558,14 +564,16 @@ class SwiftGCPDriver(BaseDriver):
         metadata = self._set_container_metadata(blob)
 
         blob.metadata = metadata
-        blob.patch()
+        deadline = Retry(deadline=60)
+        blob.patch(timeout=10, retry=deadline)
 
         # updates account container count
         labels = bucket.labels
         container_count = int(labels.get('container-count', 0))
         labels['container-count'] = container_count + 1
         bucket.labels = labels
-        bucket.patch()
+        deadline = Retry(deadline=60)
+        bucket.patch(timeout=10, retry=deadline)
 
         return self._default_response('', 201)
 
@@ -589,7 +597,8 @@ class SwiftGCPDriver(BaseDriver):
         metadata = self._set_container_metadata(blob)
 
         blob.metadata = metadata
-        blob.patch()
+        deadline = Retry(deadline=60)
+        blob.patch(timeout=10, retry=deadline)
 
         return self._default_response('', 204)
 
@@ -624,7 +633,8 @@ class SwiftGCPDriver(BaseDriver):
         container_count = int(labels.get('container-count', 0))
         labels['container-count'] = max(0, container_count - 1)
         bucket.labels = labels
-        bucket.patch()
+        deadline = Retry(deadline=60)
+        bucket.patch(timeout=10, retry=deadline)
 
         return self._default_response('', 204)
 
@@ -729,6 +739,8 @@ class SwiftGCPDriver(BaseDriver):
                 self.account,
                 timeout=30
             )
+
+        self.obj = urllib.unquote(self.obj)
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
@@ -769,6 +781,7 @@ class SwiftGCPDriver(BaseDriver):
             if aresp:
                 return self._default_response('', 401)
 
+        self.obj = urllib.unquote(self.obj)
         obj_path = "%s/%s" % (self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
@@ -871,8 +884,21 @@ class SwiftGCPDriver(BaseDriver):
         account_bucket.labels = labels
         container_blob.metadata = metadata
 
-        account_bucket.patch()
-        container_blob.patch()
+        while True:
+            try:
+                deadline = Retry(deadline=60)
+                account_bucket.patch(timeout=10, retry=deadline)
+                break
+            except Conflict:
+                time.sleep(5)
+
+        while True:
+            try:
+                deadline = Retry(deadline=60)
+                container_blob.patch(timeout=10, retry=deadline)
+                break
+            except Conflict:
+                time.sleep(5)
 
     @cors_validation
     def put_object(self, req, bucket=None, obj=None):
@@ -887,6 +913,7 @@ class SwiftGCPDriver(BaseDriver):
         if not container_blob:
             return self._default_response('The resource could not be found', 404)
 
+        self.obj = urllib.unquote(self.obj)
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.blob(obj_path)
         content_type = self.req.headers.get('Content-Type')
@@ -960,7 +987,8 @@ class SwiftGCPDriver(BaseDriver):
             metadata['Content-Encoding'] = blob.content_encoding
             blob.content_encoding = None
             blob.metadata = metadata
-            blob.patch()
+            deadline = Retry(deadline=60)
+            blob.patch(timeout=10, retry=deadline)
 
         headers = self.get_object_headers(blob)
         headers['Content-Length'] = 0
@@ -976,6 +1004,8 @@ class SwiftGCPDriver(BaseDriver):
                 self.account,
                 timeout=30
             )
+
+        self.obj = urllib.unquote(self.obj)
         obj_path = "{}/{}".format(self.container, self.obj)
         blob = bucket.get_blob(obj_path)
 
@@ -990,7 +1020,8 @@ class SwiftGCPDriver(BaseDriver):
             return self._error_response('X-Delete Error')
 
         if updated:
-            blob.patch()
+            deadline = Retry(deadline=60)
+            blob.patch(timeout=10, retry=deadline)
 
         return self._default_response('', 202)  # Accepted
 
@@ -1001,6 +1032,8 @@ class SwiftGCPDriver(BaseDriver):
                 self.account,
                 timeout=30
             )
+
+        self.obj = urllib.unquote(self.obj)
         obj_path = "{}/{}".format(self.container, self.obj)
 
         container_blob = bucket.get_blob(self.container + '/')
