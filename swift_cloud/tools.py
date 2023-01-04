@@ -13,6 +13,7 @@ class SwiftCloudTools:
         self.api_token = conf.get('tools_api_token')
         self.api_url = conf.get('tools_api_url')
         self.expirer_url = self.api_url + '/v1/expirer/'
+        self.counter_url = self.api_url + '/v1/counter/'
         self.container_info_url = self.api_url + '/v1/container-info/'
 
     def add_delete_at(self, account, container, obj, date):
@@ -54,6 +55,46 @@ class SwiftCloudTools:
         try:
             date_time = datetime.fromtimestamp(int(timestamp))
             return True, date_time.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as err:
+            log.error(err)
+            return False, str(err)
+
+    def add_counter(self, action, kind, account, container=None, bytes_used=None, counter=None):
+        try:
+            res = requests.post(self.counter_url,
+                data=json.dumps({
+                    'action': action,
+                    'kind': kind,
+                    'account': account,
+                    'container': container,
+                    'bytes_used': bytes_used,
+                    'counter': counter
+                }),
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-Auth-Token': self.api_token
+                })
+            return True, res.text
+        except Exception as err:
+            log.error(err)
+            return False, str(err)
+
+    def remove_counter(self, action, kind, account, container=None, bytes_used=None, counter=None):
+        try:
+            res = requests.delete(self.counter_url,
+                data=json.dumps({
+                    'action': action,
+                    'kind': kind,
+                    'account': account,
+                    'container': container,
+                    'bytes_used': bytes_used,
+                    'counter': counter
+                }),
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-Auth-Token': self.api_token
+                })
+            return True, res.text
         except Exception as err:
             log.error(err)
             return False, str(err)

@@ -6,7 +6,6 @@ import logging
 import datetime
 import mimetypes
 import urllib
-import time
 
 from swift.common.swob import Response, wsgi_to_str
 from swift.common.utils import split_path, Timestamp
@@ -567,13 +566,9 @@ class SwiftGCPDriver(BaseDriver):
         deadline = Retry(deadline=60)
         blob.patch(timeout=10, retry=deadline)
 
-        # updates account container count
-        labels = bucket.labels
-        container_count = int(labels.get('container-count', 0))
-        labels['container-count'] = container_count + 1
-        bucket.labels = labels
-        deadline = Retry(deadline=60)
-        bucket.patch(timeout=10, retry=deadline)
+        account = self.account.split('_')[1]
+        result, msg = self.tools.add_counter('CREATE', 'account', account)
+        log.info(msg)
 
         return self._default_response('', 201)
 
@@ -628,13 +623,9 @@ class SwiftGCPDriver(BaseDriver):
 
         blob.delete()
 
-        # updates account container count
-        labels = bucket.labels
-        container_count = int(labels.get('container-count', 0))
-        labels['container-count'] = max(0, container_count - 1)
-        bucket.labels = labels
-        deadline = Retry(deadline=60)
-        bucket.patch(timeout=10, retry=deadline)
+        account = self.account.split('_')[1]
+        result, msg = self.tools.remove_counter('DELETE', 'account', account)
+        log.info(msg)
 
         return self._default_response('', 204)
 
@@ -847,59 +838,36 @@ class SwiftGCPDriver(BaseDriver):
 
         return True, blob
 
-    def _update_counters(self,
-                         account_bucket,
-                         container_blob,
-                         bytes_used,
-                         has_obj,
-                         obj_size,
-                         remove=False):
-        labels = account_bucket.labels or {}
-        metadata = container_blob.metadata or {}
+    def _update_counters(self, account_bucket, container_blob, bytes_used, has_obj, obj_size, action):
+        account = self.account.split('_')[1]
+        container = container_blob.name.split('/')[0]
 
-        account_obj_count = int(labels.get('object-count', 0))
-        account_bytes_used = int(labels.get('bytes-used', 0))
-        container_obj_count = int(metadata.get('object-count', 0))
-        container_bytes_used = int(metadata.get('bytes-used', 0))
+        if action == 'delete' and has_obj:
+            result, msg = self.tools.remove_counter(
+                'DELETE',
+                'container',
+                account,
+                container,
+                bytes_used
+            )
+            log.info(msg)
 
-        if remove:
-            count = 1 if has_obj else 0
-            used = bytes_used if has_obj else 0
-
-            labels['object-count'] = max(0, account_obj_count - count)
-            labels['bytes-used'] = max(0, account_bytes_used - used)
-            metadata['object-count'] = max(0, container_obj_count - count)
-            metadata['bytes-used'] = max(0, container_bytes_used - used)
-        else:
+        if action == 'create':
             count = 1 if not has_obj else 0
             used = bytes_used
 
             if has_obj:
                 used = bytes_used - obj_size
 
-            labels['object-count'] = account_obj_count + count
-            labels['bytes-used'] = account_bytes_used + used
-            metadata['object-count'] = container_obj_count + count
-            metadata['bytes-used'] = container_bytes_used + used
-
-        account_bucket.labels = labels
-        container_blob.metadata = metadata
-
-        while True:
-            try:
-                deadline = Retry(deadline=60)
-                account_bucket.patch(timeout=10, retry=deadline)
-                break
-            except Conflict:
-                time.sleep(5)
-
-        while True:
-            try:
-                deadline = Retry(deadline=60)
-                container_blob.patch(timeout=10, retry=deadline)
-                break
-            except Conflict:
-                time.sleep(5)
+            result, msg = self.tools.add_counter(
+                'CREATE',
+                'container',
+                account,
+                container,
+                used,
+                count
+            )
+            log.info(msg)
 
     @cors_validation
     def put_object(self, req, bucket=None, obj=None):
@@ -994,7 +962,14 @@ class SwiftGCPDriver(BaseDriver):
         headers = self.get_object_headers(blob)
         headers['Content-Length'] = 0
 
-        self._update_counters(bucket, container_blob, len(obj_data), has_obj, obj_size)
+        self._update_counters(
+            bucket,
+            container_blob,
+            len(obj_data),
+            has_obj,
+            obj_size,
+            'create'
+        )
 
         return self._default_response('', 201, headers)
 
@@ -1058,6 +1033,13 @@ class SwiftGCPDriver(BaseDriver):
 
         blob.delete()
 
-        self._update_counters(bucket, container_blob, blob.size, has_obj, obj_size, remove=True)
+        self._update_counters(
+            bucket,
+            container_blob,
+            blob.size,
+            has_obj,
+            obj_size,
+            'delete'
+        )
 
         return self._default_response('', 204)
