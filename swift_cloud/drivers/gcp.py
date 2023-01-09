@@ -624,7 +624,7 @@ class SwiftGCPDriver(BaseDriver):
         blob.delete()
 
         account = self.account.split('_')[1]
-        result, msg = self.tools.remove_counter('DELETE', 'account', account)
+        result, msg = self.tools.reset_counter('RESET', 'account', account)
         log.info(msg)
 
         return self._default_response('', 204)
@@ -838,17 +838,16 @@ class SwiftGCPDriver(BaseDriver):
 
         return True, blob
 
-    def _update_counters(self, account_bucket, container_blob, bytes_used, has_obj, obj_size, action):
+    def _update_counters(self, container, bytes_used, has_obj, obj_size, action):
         account = self.account.split('_')[1]
-        container = container_blob.name.split('/')[0]
 
         if action == 'delete' and has_obj:
             result, msg = self.tools.remove_counter(
                 'DELETE',
                 'container',
                 account,
-                container,
-                bytes_used
+                container=container,
+                bytes_used=bytes_used
             )
             log.info(msg)
 
@@ -863,9 +862,9 @@ class SwiftGCPDriver(BaseDriver):
                 'CREATE',
                 'container',
                 account,
-                container,
-                used,
-                count
+                container=container,
+                bytes_used=used,
+                counter=count
             )
             log.info(msg)
 
@@ -933,6 +932,7 @@ class SwiftGCPDriver(BaseDriver):
                 continue
             path += '/' + obj
             folder = bucket.blob(path + '/')
+
             folder.upload_from_string('',
                 content_type='application/directory',
                 num_retries=3,
@@ -963,8 +963,7 @@ class SwiftGCPDriver(BaseDriver):
         headers['Content-Length'] = 0
 
         self._update_counters(
-            bucket,
-            container_blob,
+            self.container,
             len(obj_data),
             has_obj,
             obj_size,
@@ -1033,13 +1032,15 @@ class SwiftGCPDriver(BaseDriver):
 
         blob.delete()
 
-        self._update_counters(
-            bucket,
-            container_blob,
-            blob.size,
-            has_obj,
-            obj_size,
-            'delete'
-        )
+        path = self.obj.split('/')[-1:]
+
+        if len(path[0]) > 0:
+            self._update_counters(
+                self.container,
+                blob.size,
+                has_obj,
+                obj_size,
+                'delete'
+            )
 
         return self._default_response('', 204)

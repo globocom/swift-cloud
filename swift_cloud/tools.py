@@ -60,16 +60,24 @@ class SwiftCloudTools:
             return False, str(err)
 
     def add_counter(self, action, kind, account, container=None, bytes_used=None, counter=None):
+        data = {
+            'action': action,
+            'kind': kind,
+            'account': account
+        }
+
+        if container != None and type(container) == str:
+            data['container'] = container
+
+        if bytes_used != None and type(bytes_used) == int:
+            data['bytes-used'] = bytes_used
+
+        if counter != None and type(counter) == int:
+            data['counter'] = counter
+
         try:
             res = requests.post(self.counter_url,
-                data=json.dumps({
-                    'action': action,
-                    'kind': kind,
-                    'account': account,
-                    'container': container,
-                    'bytes_used': bytes_used,
-                    'counter': counter
-                }),
+                data=json.dumps(data),
                 headers={
                     'Content-Type': 'application/json',
                     'X-Auth-Token': self.api_token
@@ -80,16 +88,43 @@ class SwiftCloudTools:
             return False, str(err)
 
     def remove_counter(self, action, kind, account, container=None, bytes_used=None, counter=None):
+        data = {
+            'action': action,
+            'kind': kind,
+            'account': account
+        }
+
+        if container != None and type(container) == str:
+            data['container'] = container
+
+        if bytes_used != None and type(bytes_used) == int:
+            data['bytes-used'] = bytes_used
+
+        if counter != None and type(counter) == int:
+            data['counter'] = counter
+
         try:
             res = requests.delete(self.counter_url,
-                data=json.dumps({
-                    'action': action,
-                    'kind': kind,
-                    'account': account,
-                    'container': container,
-                    'bytes_used': bytes_used,
-                    'counter': counter
-                }),
+                data=json.dumps(data),
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-Auth-Token': self.api_token
+                })
+            return True, res.text
+        except Exception as err:
+            log.error(err)
+            return False, str(err)
+
+    def reset_counter(self, action, kind, account):
+        data = {
+            'action': action,
+            'kind': kind,
+            'account': account
+        }
+
+        try:
+            res = requests.delete(self.counter_url,
+                data=json.dumps(data),
                 headers={
                     'Content-Type': 'application/json',
                     'X-Auth-Token': self.api_token
