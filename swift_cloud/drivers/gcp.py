@@ -23,7 +23,11 @@ from swift_cloud.decorators import cors_validation
 
 log = logging.getLogger(__name__)
 
-BUCKET_LOCATION = os.environ.get('BUCKET_LOCATION', 'US-EAST1')
+file = open('/etc/environment', 'r')
+data = json.load(file)
+file.close()
+
+BUCKET_LOCATION = str(data.get('BUCKET_LOCATION'))
 RESERVED_META = [
     'x-delete-at',
     'x-delete-after',
