@@ -716,9 +716,12 @@ class SwiftGCPDriver(BaseDriver):
             key = item.lower()
             metadata[key] = self.req.headers.get(item)
 
-        if len(meta_keys) or len(reserved_keys):
-            blob.metadata = metadata
-            updated = True
+        utc_local = datetime.datetime.utcnow()
+        utc_local = utc_local.replace(tzinfo=pytz.utc)
+        metadata['last-modified'] = utc_local.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+        blob.metadata = metadata
+        updated = True
 
         return updated, blob
 
