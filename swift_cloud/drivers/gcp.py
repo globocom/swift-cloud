@@ -657,13 +657,21 @@ class SwiftGCPDriver(BaseDriver):
             return self.delete_object(self.req)
 
     def get_object_headers(self, blob):
-        headers = {
-            'Content-Type': blob.content_type,
-            # 'Etag': blob.etag,
-            'Last-Modified': datetime.datetime.strftime(
+        last_modified = None
+
+        if blob.metadata:
+            last_modified = metadata.get('last-modified')
+
+        if not last_modified:
+            last_modified = datetime.datetime.strftime(
                 blob.updated,
                 '%a, %d %b %Y %H:%M:%S GMT'
             )
+
+        headers = {
+            'Content-Type': blob.content_type,
+            # 'Etag': blob.etag,
+            'Last-Modified': last_modified
         }
 
         if blob.cache_control:
