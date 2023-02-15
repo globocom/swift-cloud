@@ -35,7 +35,8 @@ RESERVED_META = [
     'x-history-location',
     'x-undelete-enabled',
     'x-container-sysmeta-undelete-enabled',
-    'content-encoding'
+    'content-encoding',
+    'last-modified'
 ]
 
 
@@ -258,13 +259,16 @@ class SwiftGCPDriver(BaseDriver):
             return self._error_response(err)
 
         container_list = []
+
         for item in containers:
             metadata = item.metadata or {}
+            last_modified = metadata.get('last-modified', item.updated.isoformat())
+
             container_list.append({
                 'count': metadata.get('object-count', 0),
                 'bytes': metadata.get('bytes-used', 0),
                 'name': item.name.replace('/', ''),
-                'last_modified': item.updated.isoformat()
+                'last_modified': last_modified
             })
 
         labels = account_bucket.labels
@@ -442,6 +446,8 @@ class SwiftGCPDriver(BaseDriver):
         object_list = []
 
         for item in blobs:
+            metadata = item.metadata or {}
+
             if 'application/directory' in item.content_type:
                 has_object = len(list(filter(lambda x: item.name in x.name, objects)))
                 if item.name != prefix and has_object == 0:
@@ -449,20 +455,24 @@ class SwiftGCPDriver(BaseDriver):
                         'subdir': '/'.join(item.name.split('/')[1:])
                     })
                 elif level > 1:
+                    last_modified = metadata.get('last-modified', item.updated.isoformat())
+
                     object_list.append({
                         'name': item.name.replace(self.container + '/', ''),
                         'bytes': item.size,
                         'hash': item.md5_hash,
                         'content_type': item.content_type,
-                        'last_modified': item.updated.isoformat()
+                        'last_modified': last_modified
                     })
             else:
+                last_modified = metadata.get('last-modified', item.updated.isoformat())
+
                 object_list.append({
                     'name': item.name.replace(self.container + '/', ''),
                     'bytes': item.size,
                     'hash': item.md5_hash,
                     'content_type': item.content_type,
-                    'last_modified': item.updated.isoformat()
+                    'last_modified': last_modified
                 })
 
         headers = {}
@@ -657,21 +667,16 @@ class SwiftGCPDriver(BaseDriver):
             return self.delete_object(self.req)
 
     def get_object_headers(self, blob):
-        last_modified = None
-
-        if blob.metadata:
-            last_modified = metadata.get('last-modified')
-
-        if not last_modified:
-            last_modified = datetime.datetime.strftime(
-                blob.updated,
-                '%a, %d %b %Y %H:%M:%S GMT'
-            )
+        metadata = blob.metadata or {}
+        last_modified = metadata.get('last-modified', blob.updated.isoformat())
 
         headers = {
             'Content-Type': blob.content_type,
             # 'Etag': blob.etag,
-            'Last-Modified': last_modified
+            'Last-Modified': datetime.datetime.strptime(
+                last_modified,
+                '%Y-%m-%dT%H:%M:%S.%f+00:00'
+            ).strftime('%a, %d %b %Y %H:%M:%S GMT')
         }
 
         if blob.cache_control:
@@ -726,7 +731,7 @@ class SwiftGCPDriver(BaseDriver):
 
         utc_local = datetime.datetime.utcnow()
         utc_local = utc_local.replace(tzinfo=pytz.utc)
-        metadata['last-modified'] = utc_local.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        metadata['last-modified'] = utc_local.isoformat()
 
         blob.metadata = metadata
         updated = True
