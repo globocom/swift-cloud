@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='swift_cloud',
-    version='0.2.31',
+    version='0.2.33p',
     description='Middleware for Openstack Swift to store objecs on multiple cloud providers',
     author='Storm',
     author_email='storm@g.globo',
