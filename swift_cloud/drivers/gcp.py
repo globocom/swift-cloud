@@ -405,7 +405,7 @@ class SwiftGCPDriver(BaseDriver):
         delimiter = req.params.get('delimiter')
         prefix = self.container + '/'
         if self.prefix:
-            prefix = '/'.join([self.container, self.prefix + ('' if self.prefix[-1] == '/' else '/')])
+            prefix = '/'.join([self.container, self.prefix])
         if marker:
             marker = '{}/{}'.format(self.container, marker)
         params = {'prefix': prefix}
@@ -450,15 +450,20 @@ class SwiftGCPDriver(BaseDriver):
 
             if 'application/directory' in item.content_type:
                 has_object = len(list(filter(lambda x: item.name in x.name, objects)))
+
                 if item.name != prefix and has_object == 0:
                     object_list.append({
                         'subdir': '/'.join(item.name.split('/')[1:])
                     })
                 elif level > 1:
                     last_modified = metadata.get('last-modified', item.updated.isoformat())
+                    name = item.name.replace(self.container + '/', '')
+
+                    if (self.container in prefix.split('/')[1:-1]):
+                        name = item.name.replace(self.container + '/', '', 1)
 
                     object_list.append({
-                        'name': item.name.replace(self.container + '/', ''),
+                        'name': name,
                         'bytes': item.size,
                         'hash': item.md5_hash,
                         'content_type': item.content_type,
@@ -468,7 +473,7 @@ class SwiftGCPDriver(BaseDriver):
                 last_modified = metadata.get('last-modified', item.updated.isoformat())
 
                 object_list.append({
-                    'name': item.name.replace(self.container + '/', ''),
+                    'name': item.name.replace(self.container + '/', '', 1),
                     'bytes': item.size,
                     'hash': item.md5_hash,
                     'content_type': item.content_type,
